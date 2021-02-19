@@ -1,7 +1,6 @@
 use std::fs::File;
 use std::io::Read;
 use crate::elf::ELFHeader;
-use std::borrow::Borrow;
 
 mod elf;
 

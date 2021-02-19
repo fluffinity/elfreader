@@ -1,5 +1,3 @@
-use crate::elf::ELFParseError::NoELF;
-
 #[derive(Debug)]
 pub enum ELFFileType {
     None,
@@ -136,7 +134,7 @@ impl ELFHeader {
             let magic_bytes = [bytes[0], bytes[1], bytes[2], bytes[3]];
             let magic = u32::from_le_bytes(magic_bytes);
             if !is_valid_maigic(magic) {
-                return Err(NoELF(magic));
+                return Err(ELFParseError::NoELF(magic));
             }
             let word_width = ELFWordWidth::from_byte(bytes[4])?;
             let endianness = ELFEndianness::from_byte(bytes[5])?;
