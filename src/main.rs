@@ -23,14 +23,11 @@ fn main() {
     };
     let mut buf = [0; 512];
     let bytes_read = file.read(&mut buf);
-    match bytes_read {
-        Err(e) => {
-            eprintln!("error reading file. Abort");
-            eprintln!("reason: {}", e);
-            return;
-        }
-        _ => {}
-    };
+    if let(Err(e)) = bytes_read {
+        eprintln!("error reading file. Abort");
+        eprintln!("reason: {}", e);
+        return;
+    }
     let bytes = &buf;
     let header = ELFHeader::from_bytes(bytes);
     let header =  match header {
