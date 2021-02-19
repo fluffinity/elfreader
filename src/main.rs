@@ -11,7 +11,7 @@ fn main() {
         eprintln!("usage: elfreader <path-to-elf-file>");
         return;
     }
-    let filename = args.into_iter().take(2).last().expect("args should contain 2 entries");
+    let filename = args[1].clone();
     println!("parsing ELF header of file {}", filename);
     let mut file = match File::open(filename.as_str()) {
         Ok(f) => f,
