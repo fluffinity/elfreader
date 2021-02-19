@@ -23,7 +23,7 @@ fn main() {
     };
     let mut buf = [0; 512];
     let bytes_read = file.read(&mut buf);
-    if let(Err(e)) = bytes_read {
+    if let Err(e) = bytes_read {
         eprintln!("error reading file. Abort");
         eprintln!("reason: {}", e);
         return;
