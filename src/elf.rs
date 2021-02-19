@@ -159,7 +159,7 @@ impl ELFHeader {
 
 static ELF_ASCII: [u8;3] = [0x45, 0x4c, 0x46];
 
-fn is_valid_maigic(magic: u32) -> bool {
+fn is_valid_magic(magic: u32) -> bool {
     let bytes = magic.to_le_bytes();
     let magic_bytes = &bytes[1..];
     (magic & 0xff == 0x7f) && magic_bytes.eq(&ELF_ASCII)
