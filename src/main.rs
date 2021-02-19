@@ -29,8 +29,7 @@ fn main() {
         return;
     }
     let bytes = &buf;
-    let header = ELFHeader::from_bytes(bytes);
-    let header =  match header {
+    let header =  match ELFHeader::from_bytes(bytes) {
         Ok(h) => h,
         Err(e) => {
             eprintln!("Error parsing ELF header. Reason:");

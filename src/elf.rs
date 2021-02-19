@@ -133,7 +133,7 @@ impl ELFHeader {
         } else {
             let magic_bytes = [bytes[0], bytes[1], bytes[2], bytes[3]];
             let magic = u32::from_le_bytes(magic_bytes);
-            if !is_valid_maigic(magic) {
+            if !is_valid_magic(magic) {
                 return Err(ELFParseError::NoELF(magic));
             }
             let word_width = ELFWordWidth::from_byte(bytes[4])?;
