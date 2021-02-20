@@ -3,6 +3,7 @@ use std::io::Read;
 use crate::elf::ELFHeader;
 
 mod elf;
+mod test_from_bytes_endianned;
 
 fn main() {
     println!("Hello, world!");

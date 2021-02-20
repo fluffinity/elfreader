@@ -75,13 +75,14 @@ pub enum ELFArch {
 impl ELFFileType {
 
     fn from_u16(i: u16) -> Result<ELFFileType, ELFParseError> {
+        use ELFFileType::*;
         match i {
-            0 => Ok(ELFFileType::None),
-            1 => Ok(ELFFileType::Relocatable),
-            2 => Ok(ELFFileType::Executable),
-            3 => Ok(ELFFileType::Shared),
-            4 => Ok(ELFFileType::Core),
-            _ if i >= 0xff00 => Ok(ELFFileType::Specific(i)),
+            0 => Ok(None),
+            1 => Ok(Relocatable),
+            2 => Ok(Executable),
+            3 => Ok(Shared),
+            4 => Ok(Core),
+            _ if i >= 0xff00 => Ok(Specific(i)),
             _ => Err(ELFParseError::InvalidFileType(i))
         }
     }
@@ -98,9 +99,10 @@ impl ELFFileType {
 impl ELFWordWidth {
 
     fn from_byte(b: u8) -> Result<ELFWordWidth, ELFParseError> {
+        use ELFWordWidth::*;
         match b {
-            1 => Ok(ELFWordWidth::Word32),
-            2 => Ok(ELFWordWidth::Word64),
+            1 => Ok(Word32),
+            2 => Ok(Word64),
             _ => Err(ELFParseError::InvalidWordWidth(b))
         }
     }
@@ -109,9 +111,10 @@ impl ELFWordWidth {
 impl ELFEndianness {
 
     fn from_byte(b: u8) -> Result<ELFEndianness, ELFParseError> {
+        use ELFEndianness::*;
         match b {
-            1 => Ok(ELFEndianness::Little),
-            2 => Ok(ELFEndianness::Big),
+            1 => Ok(Little),
+            2 => Ok(Big),
             _ => Err(ELFParseError::InvalidEndianness(b))
         }
     }
@@ -257,7 +260,7 @@ fn is_valid_magic(magic: u32) -> bool {
 
 
 //TODO maybe reimplement this facility with macros to ensure the correct number of bytes at compile time
-trait FromBytesEndianned {
+pub(crate) trait FromBytesEndianned {
     fn from_bytes(bytes: &[u8], endianness: ELFEndianness) -> Self;
 }
 
