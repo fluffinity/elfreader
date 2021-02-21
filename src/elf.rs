@@ -87,7 +87,7 @@ impl ELFFileType {
         }
     }
 
-    fn from_bytes(bytes: &[u8], endianness: ELFEndianness) -> Result<ELFFileType, ELFParseError> {
+    pub(crate) fn from_bytes(bytes: &[u8], endianness: ELFEndianness) -> Result<ELFFileType, ELFParseError> {
         if bytes.len() < 2 {
             Err(ELFParseError::InsufficientPartLength(bytes.len()))
         } else {
@@ -98,7 +98,7 @@ impl ELFFileType {
 
 impl ELFWordWidth {
 
-    fn from_byte(b: u8) -> Result<ELFWordWidth, ELFParseError> {
+    pub(crate) fn from_byte(b: u8) -> Result<ELFWordWidth, ELFParseError> {
         use ELFWordWidth::*;
         match b {
             1 => Ok(Word32),
@@ -110,7 +110,7 @@ impl ELFWordWidth {
 
 impl ELFEndianness {
 
-    fn from_byte(b: u8) -> Result<ELFEndianness, ELFParseError> {
+    pub(crate) fn from_byte(b: u8) -> Result<ELFEndianness, ELFParseError> {
         use ELFEndianness::*;
         match b {
             1 => Ok(Little),
@@ -122,7 +122,7 @@ impl ELFEndianness {
 
 impl ElfAbi {
 
-    fn from_byte(b: u8) -> ElfAbi {
+    pub(crate) fn from_byte(b: u8) -> ElfAbi {
         use ElfAbi::*;
         match b {
             0x00 => SysV,
@@ -181,7 +181,7 @@ impl ELFArch {
         }
     }
 
-    fn from_bytes(bytes: &[u8], endianness: ELFEndianness) -> Result<ELFArch, ELFParseError> {
+    pub(crate) fn from_bytes(bytes: &[u8], endianness: ELFEndianness) -> Result<ELFArch, ELFParseError> {
         if bytes.len() < 2 {
             Err(ELFParseError::InsufficientPartLength(bytes.len()))
         } else {
@@ -266,9 +266,7 @@ pub(crate) trait FromBytesEndianned {
 
 impl FromBytesEndianned for u16 {
     fn from_bytes(bytes: &[u8], endianness: ELFEndianness) -> Self {
-        // it is fine to omit length checks here as this trait and it's implementation
-        // are private to this module and if the given slice is too short
-        // the program will panic at runtime ensuring memory safety
+        assert!(bytes.len() >= 2);
         let bytes = get_u16_bytes(bytes);
         match endianness{
             ELFEndianness::Little => u16::from_le_bytes(bytes),
@@ -279,6 +277,7 @@ impl FromBytesEndianned for u16 {
 
 impl FromBytesEndianned for u32 {
     fn from_bytes(bytes: &[u8], endianness: ELFEndianness) -> Self {
+        assert!(bytes.len() >= 2);
         let bytes = get_u32_bytes(bytes);
         match endianness{
             ELFEndianness::Little => u32::from_le_bytes(bytes),

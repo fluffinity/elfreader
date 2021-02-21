@@ -1,9 +1,10 @@
 use std::fs::File;
 use std::io::Read;
-use crate::elf::ELFHeader;
 
 mod elf;
+mod test_elf_structs_from_bytes;
 mod test_from_bytes_endianned;
+use elf::ELFHeader;
 
 fn main() {
     println!("Hello, world!");
