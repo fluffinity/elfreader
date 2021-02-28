@@ -69,6 +69,7 @@ pub enum ELFArch {
     AArch64,
     RISCV,
     BPF,
+    WDC65C816,
     Unknown
 }
 
@@ -77,11 +78,11 @@ impl ELFFileType {
     fn from_u16(i: u16) -> Result<ELFFileType, ELFParseError> {
         use ELFFileType::*;
         match i {
-            0 => Ok(None),
-            1 => Ok(Relocatable),
-            2 => Ok(Executable),
-            3 => Ok(Shared),
-            4 => Ok(Core),
+            0x0000 => Ok(None),
+            0x0001 => Ok(Relocatable),
+            0x0002 => Ok(Executable),
+            0x0003 => Ok(Shared),
+            0x0004 => Ok(Core),
             _ if i >= 0xff00 => Ok(Specific(i)),
             _ => Err(ELFParseError::InvalidFileType(i))
         }
@@ -101,8 +102,8 @@ impl ELFWordWidth {
     pub(crate) fn from_byte(b: u8) -> Result<ELFWordWidth, ELFParseError> {
         use ELFWordWidth::*;
         match b {
-            1 => Ok(Word32),
-            2 => Ok(Word64),
+            0x01 => Ok(Word32),
+            0x02 => Ok(Word64),
             _ => Err(ELFParseError::InvalidWordWidth(b))
         }
     }
@@ -113,8 +114,8 @@ impl ELFEndianness {
     pub(crate) fn from_byte(b: u8) -> Result<ELFEndianness, ELFParseError> {
         use ELFEndianness::*;
         match b {
-            1 => Ok(Little),
-            2 => Ok(Big),
+            0x01 => Ok(Little),
+            0x02 => Ok(Big),
             _ => Err(ELFParseError::InvalidEndianness(b))
         }
     }
@@ -153,35 +154,37 @@ impl ELFArch {
     fn from_u16(i: u16) -> ELFArch {
         use ELFArch::*;
         match i {
-            0x00 => Unspecified,
-            0x01 => WE32100,
-            0x02 => Sparc,
-            0x03 => X86,
-            0x04 => M68k,
-            0x05 => M88k,
-            0x06 => IntelMCU,
-            0x07 => Intel80860,
-            0x08 => MIPS,
-            0x09 => System370,
-            0x0A => RS3000,
-            0x0E => PARISC,
-            0x13 => Intel80960,
-            0x14 => PowerPC,
-            0x15 => PowerPC64,
-            0x16 => S390,
-            0x28 => ARM,
-            0x2A => SuperH,
-            0x32 => IA64,
-            0x3E => X86_64,
-            0x8C => TMS320C6000,
-            0xB7 => AArch64,
-            0xF3 => RISCV,
-            0xF7 => BPF,
+            0x0000 => Unspecified,
+            0x0001 => WE32100,
+            0x0002 => Sparc,
+            0x0003 => X86,
+            0x0004 => M68k,
+            0x0005 => M88k,
+            0x0006 => IntelMCU,
+            0x0007 => Intel80860,
+            0x0008 => MIPS,
+            0x0009 => System370,
+            0x000A => RS3000,
+            0x000E => PARISC,
+            0x0013 => Intel80960,
+            0x0014 => PowerPC,
+            0x0015 => PowerPC64,
+            0x0016 => S390,
+            0x0028 => ARM,
+            0x002A => SuperH,
+            0x0032 => IA64,
+            0x003E => X86_64,
+            0x008C => TMS320C6000,
+            0x00B7 => AArch64,
+            0x00F3 => RISCV,
+            0x00F7 => BPF,
+            0x0101 => WDC65C816,
             _ => Unknown
         }
     }
 
     pub(crate) fn from_bytes(bytes: &[u8], endianness: ELFEndianness) -> Result<ELFArch, ELFParseError> {
+        //TODO maybe don't allow too large slices as well ?
         if bytes.len() < 2 {
             Err(ELFParseError::InsufficientPartLength(bytes.len()))
         } else {
@@ -190,7 +193,7 @@ impl ELFArch {
     }
 }
 
-#[derive(Debug, PartialEq)]
+#[derive(Debug, PartialEq, Clone)]
 pub struct ELFHeader {
     word_width: ELFWordWidth,
     endianness: ELFEndianness,
@@ -214,14 +217,28 @@ pub enum ELFParseError {
 
 impl ELFHeader {
 
+    pub(crate) const fn new(word_width: ELFWordWidth, endianness: ELFEndianness, header_version: u8,
+    os_abi: ElfAbi, abi_version: u8, file_type: ELFFileType, arch: ELFArch, version: u32) -> ELFHeader {
+        ELFHeader {
+            word_width,
+            endianness,
+            header_version,
+            os_abi,
+            abi_version,
+            file_type,
+            arch,
+            version
+        }
+    }
+
     pub fn from_bytes(bytes: &[u8]) -> Result<ELFHeader, ELFParseError> {
-        if bytes.len() < 20 {
+        if bytes.len() < 24 {
             return Err(ELFParseError::InvalidHeaderLength(bytes.len()));
         }
 
-        let magic_bytes = [bytes[0], bytes[1], bytes[2], bytes[3]];
+        let magic_bytes = get_u32_bytes(bytes);
         let magic = u32::from_le_bytes(magic_bytes);
-        if !is_valid_magic(magic) {
+        if !is_valid_magic(magic_bytes) {
             return Err(ELFParseError::NoELF(magic));
         }
 
@@ -237,25 +254,15 @@ impl ELFHeader {
         let arch = ELFArch::from_bytes(&bytes[OFFSET+2..OFFSET+4], endianness)?;
         let version = u32::from_bytes(&bytes[OFFSET+4..OFFSET+8], endianness);
 
-        Ok(ELFHeader {
-            word_width,
-            endianness,
-            header_version,
-            os_abi,
-            abi_version,
-            file_type,
-            arch,
-            version
-        })
+        Ok(ELFHeader::new(word_width, endianness, header_version, os_abi, abi_version, file_type, arch, version))
     }
 }
 
 static ELF_ASCII: [u8;3] = [0x45, 0x4C, 0x46];
 
-fn is_valid_magic(magic: u32) -> bool {
-    let bytes = magic.to_le_bytes();
-    let magic_bytes = &bytes[1..];
-    (magic & 0xFF == 0x7F) && magic_bytes.eq(&ELF_ASCII)
+pub(crate) fn is_valid_magic(magic: [u8; 4]) -> bool {
+    let magic_bytes = &magic[1..];
+    (magic[0] & 0xFF == 0x7F) && magic_bytes.eq(&ELF_ASCII)
 }
 
 
