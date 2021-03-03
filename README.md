@@ -60,4 +60,4 @@ and then move the built executable into your path. Then you can simply use it vi
 * CloudABI
 * OpenVOS
 
-The hex values for the architectures are taken fron [Wikipedia](https://en.wikipedia.org/wiki/Executable_and_Linkable_Format)
+The hex values for the architectures are taken from [Wikipedia](https://en.wikipedia.org/wiki/Executable_and_Linkable_Format)
