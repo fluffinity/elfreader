@@ -6,12 +6,12 @@ mod test_elf_structs_from_bytes;
 mod test_from_bytes_endianned;
 use elf::ELFHeader;
 
-fn main() {
+fn main() -> Result<(), i32>{
     println!("Hello, world!");
     let args: Vec<String> = std::env::args().collect();
     if args.len() < 2 {
         eprintln!("usage: elfreader <path-to-elf-file>");
-        return;
+        return Ok(());
     }
     let filename = args[1].clone();
     println!("parsing ELF header of file {}", filename);
@@ -20,15 +20,15 @@ fn main() {
         Err(e) => {
             eprintln!("can not open file {}", filename);
             eprintln!("reason: {}", e);
-            return;
+            return Err(1);
         }
     };
-    let mut buf = [0; 512];
+    let mut buf = [0; 64];
     let bytes_read = file.read(&mut buf);
     if let Err(e) = bytes_read {
         eprintln!("error reading file. Abort");
         eprintln!("reason: {}", e);
-        return;
+        return Err(1);
     }
     let bytes = &buf;
     let header =  match ELFHeader::from_bytes(bytes) {
@@ -36,9 +36,11 @@ fn main() {
         Err(e) => {
             eprintln!("Error parsing ELF header. Reason:");
             eprintln!("{:?}", e);
-            return;
+            return Err(1);
         }
     };
     println!("Header parsed successfully");
+    //TODO implement pretty printing and selective printing of informations
     println!("the content is: {:?}", header);
+    Ok(())
 }
