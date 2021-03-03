@@ -11,6 +11,14 @@ just type in the following command
 
 ```cargo run <name-of-the-elf-file>```
 
+You can also first build the elfreader with
+
+```cargo build```
+
+and then move the built executable into your path. Then you can simply use it via
+
+```elfreader <name-of-the-elf-file>```
+
 ## List of identified architectures
 * AT&T WE 32100
 * SPARC
@@ -27,8 +35,29 @@ just type in the following command
 * ARM(64 bit included)
 * SuperH
 * IA-64
-* TMS320C6000 Family
+* TMS 320C6000 Family
 * RISC-V
 * BPF
+* WDC 65C816
 
-The hex values for the architectures is taken fron [Wikipedia](https://en.wikipedia.org/wiki/Executable_and_Linkable_Format)
+## List of identified ABIs
+* SysV
+* HP-UX
+* NetBSD
+* Linux
+* GNU Hurd
+* Solaris
+* AIX
+* IRIX
+* FreeBSD
+* Tru64
+* Novell Modesto
+* OpenBSD
+* OpenVMS
+* NonStopKernel
+* Aros
+* FenixOS
+* CloudABI
+* OpenVOS
+
+The hex values for the architectures are taken fron [Wikipedia](https://en.wikipedia.org/wiki/Executable_and_Linkable_Format)
