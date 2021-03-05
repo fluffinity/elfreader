@@ -6,44 +6,44 @@ mod test {
     #[test]
     fn test_file_type_ok() {
         let test_data = [
-            ([0x00, 0x00], ELFEndianness::Little, ELFFileType::None),
-            ([0x00, 0x00], ELFEndianness::Big, ELFFileType::None),
-            ([0x01, 0x00], ELFEndianness::Little, ELFFileType::Relocatable),
-            ([0x00, 0x01], ELFEndianness::Big, ELFFileType::Relocatable),
-            ([0x02, 0x00], ELFEndianness::Little, ELFFileType::Executable),
-            ([0x00, 0x02], ELFEndianness::Big, ELFFileType::Executable),
-            ([0x03, 0x00], ELFEndianness::Little, ELFFileType::Shared),
-            ([0x00, 0x03], ELFEndianness::Big, ELFFileType::Shared),
-            ([0x04, 0x00], ELFEndianness::Little, ELFFileType::Core),
-            ([0x00, 0x04], ELFEndianness::Big, ELFFileType::Core),
-            ([0x9D, 0xFF], ELFEndianness::Little, ELFFileType::Specific(0xFF9D)),
-            ([0xFF, 0x9D], ELFEndianness::Big, ELFFileType::Specific(0xFF9D))
+            ([0x00, 0x00], Endianness::Little, FileType::None),
+            ([0x00, 0x00], Endianness::Big, FileType::None),
+            ([0x01, 0x00], Endianness::Little, FileType::Relocatable),
+            ([0x00, 0x01], Endianness::Big, FileType::Relocatable),
+            ([0x02, 0x00], Endianness::Little, FileType::Executable),
+            ([0x00, 0x02], Endianness::Big, FileType::Executable),
+            ([0x03, 0x00], Endianness::Little, FileType::Shared),
+            ([0x00, 0x03], Endianness::Big, FileType::Shared),
+            ([0x04, 0x00], Endianness::Little, FileType::Core),
+            ([0x00, 0x04], Endianness::Big, FileType::Core),
+            ([0x9D, 0xFF], Endianness::Little, FileType::Specific(0xFF9D)),
+            ([0xFF, 0x9D], Endianness::Big, FileType::Specific(0xFF9D))
         ];
         for (data, endianness, expected) in test_data.iter() {
-            assert_eq!(ELFFileType::from_bytes(data, *endianness), Ok(*expected));
+            assert_eq!(FileType::from_bytes(data, *endianness), Ok(*expected));
         }
     }
 
     #[test]
     fn test_file_type_err() {
         let test_data = [
-            ([0xE3, 0xE3], ELFEndianness::Little, ELFParseError::InvalidFileType(0xE3E3)),
-            ([0xFF, 0xFE], ELFEndianness::Little, ELFParseError::InvalidFileType(0xFEFF)),
-            ([0xFE, 0xFF], ELFEndianness::Big, ELFParseError::InvalidFileType(0xFEFF))
+            ([0xE3, 0xE3], Endianness::Little, ParseError::InvalidFileType(0xE3E3)),
+            ([0xFF, 0xFE], Endianness::Little, ParseError::InvalidFileType(0xFEFF)),
+            ([0xFE, 0xFF], Endianness::Big, ParseError::InvalidFileType(0xFEFF))
         ];
         for (data, endianness, expected) in test_data.iter() {
-            assert_eq!(ELFFileType::from_bytes(data, *endianness), Err(*expected));
+            assert_eq!(FileType::from_bytes(data, *endianness), Err(*expected));
         }
     }
 
     #[test]
     fn test_word_width_ok() {
         let test_data = [
-            (0x01, ELFWordWidth::Width32),
-            (0x02, ELFWordWidth::Width64)
+            (0x01, WordWidth::Width32),
+            (0x02, WordWidth::Width64)
         ];
         for (byte, expected) in test_data.iter() {
-            assert_eq!(ELFWordWidth::from_byte(*byte), Ok(*expected));
+            assert_eq!(WordWidth::from_byte(*byte), Ok(*expected));
         }
     }
 
@@ -51,18 +51,18 @@ mod test {
     fn test_word_width_err() {
         let test_data = [0x00, 0x03, 0xFF, 0x3D];
         for &byte in test_data.iter() {
-            assert_eq!(ELFWordWidth::from_byte(byte), Err(ELFParseError::InvalidWordWidth(byte)));
+            assert_eq!(WordWidth::from_byte(byte), Err(ParseError::InvalidWordWidth(byte)));
         }
     }
 
     #[test]
     fn test_endianness_ok() {
         let test_data = [
-            (0x01, ELFEndianness::Little),
-            (0x02, ELFEndianness::Big)
+            (0x01, Endianness::Little),
+            (0x02, Endianness::Big)
         ];
         for (byte, expected) in test_data.iter() {
-            assert_eq!(ELFEndianness::from_byte(*byte), Ok(*expected));
+            assert_eq!(Endianness::from_byte(*byte), Ok(*expected));
         }
     }
 
@@ -70,13 +70,13 @@ mod test {
     fn test_endianness_err() {
         let test_data = [0x00, 0x03, 0xFF, 0x3D];
         for &byte in test_data.iter() {
-            assert_eq!(ELFEndianness::from_byte(byte), Err(ELFParseError::InvalidEndianness(byte)));
+            assert_eq!(Endianness::from_byte(byte), Err(ParseError::InvalidEndianness(byte)));
         }
     }
 
     #[test]
     fn test_abi() {
-        use ElfAbi::*;
+        use Abi::*;
         let test_data = [
             SysV,
             HpUx,
@@ -100,13 +100,13 @@ mod test {
             Unknown
         ];
         for (i, expected) in test_data.iter().enumerate() {
-            assert_eq!(ElfAbi::from_byte(i as u8), *expected);
+            assert_eq!(Abi::from_byte(i as u8), *expected);
         }
     }
 
     #[test]
     fn test_arch_ok() {
-        use ELFArch::*;
+        use Arch::*;
         let test_data = [
             (0x0000_u16, Unspecified),
             (0x0001, WE32100),
@@ -138,22 +138,63 @@ mod test {
         ];
         for (code, expected) in test_data.iter() {
             let bytes = code.to_le_bytes();
-            assert_eq!(ELFArch::from_bytes(&bytes, ELFEndianness::Little), Ok(*expected));
+            assert_eq!(Arch::from_bytes(&bytes, Endianness::Little), Ok(*expected));
         }
     }
 
     #[test]
     fn test_arch_err() {
         let test_data = [0x01_u8];
-        assert_eq!(ELFArch::from_bytes(&test_data, ELFEndianness::Little), Err(ELFParseError::InsufficientPartLength(1)));
-        assert_eq!(ELFArch::from_bytes(&test_data, ELFEndianness::Big), Err(ELFParseError::InsufficientPartLength(1)));
+        assert_eq!(Arch::from_bytes(&test_data, Endianness::Little), Err(ParseError::InsufficientPartLength(1)));
+        assert_eq!(Arch::from_bytes(&test_data, Endianness::Big), Err(ParseError::InsufficientPartLength(1)));
+    }
+
+    #[test]
+    fn test_pheader_segment_type_ok() {
+        use ProgramHeaderSegmentType::*;
+        let test_data = [
+            (0x00000000, Null),
+            (0x00000001, Load),
+            (0x00000002, Dynamic),
+            (0x00000003, Interp),
+            (0x00000004, Note),
+            (0x00000005, SharedLib),
+            (0x00000006, HeaderSegment),
+            (0x00000007, ThreadLocalStorage),
+            (0x60000000, OSSpecific(0x60000000)),
+            (0x6FFFFFFF, OSSpecific(0x6FFFFFFF)),
+            (0x6F000F00, OSSpecific(0x6F000F00)),
+            (0x70000000, ProcessorSpecific(0x70000000)),
+            (0x7FFFFFFF, ProcessorSpecific(0x7FFFFFFF)),
+            (0x7F000F00, ProcessorSpecific(0x7F000F00))
+        ];
+
+        for (num, expected) in test_data.iter() {
+            let bytes = u32::to_le_bytes(*num);
+            let result = ProgramHeaderSegmentType::from_bytes(&bytes, Endianness::Little);
+            assert_eq!(result, Ok(*expected));
+        }
+    }
+
+    #[test]
+    fn test_pheader_segment_type_err() {
+        use ParseError::InvalidProgHeaderType;
+        let test_data = [
+            0x00000008,
+            0x80000000
+        ];
+        for num in test_data.iter() {
+            let bytes = u32::to_le_bytes(*num);
+            let result = ProgramHeaderSegmentType::from_bytes(&bytes, Endianness::Little);
+            assert_eq!(result, Err(InvalidProgHeaderType(*num)));
+        }
     }
 
     #[test]
     fn test_word_ok() {
-        use ELFEndianness::*;
-        use ELFWordWidth::*;
-        use ELFWord::*;
+        use Endianness::*;
+        use WordWidth::*;
+        use Word::*;
         let test_data = [
             ([0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00], Width64, Little, Word64(0)),
             ([0x10, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00], Width32, Little, Word32(0x00000010)),
@@ -162,7 +203,7 @@ mod test {
         ];
 
         for (bytes, width, endianness, expected) in test_data.iter() {
-            let result = ELFWord::from_bytes(bytes, *width, *endianness);
+            let result = Word::from_bytes(bytes, *width, *endianness);
             assert!(result.is_ok());
             let (result, _) = result.expect("checked is_ok()");
             assert_eq!(result , *expected);
@@ -177,7 +218,7 @@ mod test {
             ([0x7F, 0x46, 0x4C, 0x46], false)
         ];
         for (bytes, expected) in test_data.iter() {
-            assert_eq!(is_valid_magic(*bytes), *expected);
+            assert_eq!(Header::is_valid_magic(*bytes), *expected);
         }
     }
 
@@ -205,7 +246,7 @@ mod test {
         // entry point
         0x00, 0x00, 0x00, 0xF0,
         // program header start
-        0x00, 0x00, 0x64, 0x00,
+        0x34, 0x00, 0x00, 0x00,
         // section header start
         0x00, 0x00, 0x30, 0x00,
         // flags
@@ -215,7 +256,7 @@ mod test {
         // program header entry size
         0x20, 0x00,
         // program header entry count
-        0x40, 0x00,
+        0x01, 0x00,
         // section header entry size
         0x10, 0x00,
         // section header entry count
@@ -248,7 +289,7 @@ mod test {
         // entry point
         0x00, 0x00, 0x00, 0x00, 0x80, 0x00, 0x00, 0x00,
         // program header start
-        0x00, 0x00, 0x00, 0x40, 0x00, 0x00, 0x00, 0x00,
+        0x40, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
         // section header start
         0x00, 0x00, 0x00, 0x80, 0x00, 0x00, 0x00, 0x00,
         // flags
@@ -256,9 +297,9 @@ mod test {
         // header size
         0x40, 0x00,
         // program header entry size
-        0x40, 0x00,
+        0x38, 0x00,
         // program header entry count
-        0x30, 0x00,
+        0x01, 0x00,
         // section header entry size
         0x00, 0x80,
         // section header entry count
@@ -267,36 +308,36 @@ mod test {
         0x2F, 0x00
     ];
 
-    static VALID_HEADER_32: ELFHeader = ELFHeader::minimal(ELFWordWidth::Width32, ELFEndianness::Little)
+    static VALID_HEADER_32: Header = Header::minimal(WordWidth::Width32, Endianness::Little)
         .header_version(0x01)
-        .abi(ElfAbi::Linux)
+        .abi(Abi::Linux)
         .abi_version(0x01)
-        .file_type(ELFFileType::Executable)
-        .arch(ELFArch::X86_64)
+        .file_type(FileType::Executable)
+        .arch(Arch::X86_64)
         .version(0x0000FF01)
-        .entry_point(ELFWord::Word32(0xF0000000))
-        .program_header_start(ELFWord::Word32(0x00640000))
-        .section_header_start(ELFWord::Word32(0x00300000))
+        .entry_point(Word::Word32(0xF0000000))
+        .program_header_start(Word::Word32(0x00000034))
+        .section_header_start(Word::Word32(0x00300000))
         .flags(0xC497F14F)
         .program_header_entry_size(0x0020)
-        .program_header_entry_count(0x0040)
+        .program_header_entry_count(0x0001)
         .section_header_entry_size(0x0010)
         .section_header_entry_count(0x0100)
         .section_names_index(0x0030);
 
-    static VALID_HEADER_64: ELFHeader = ELFHeader::minimal(ELFWordWidth::Width64, ELFEndianness::Little)
+    static VALID_HEADER_64: Header = Header::minimal(WordWidth::Width64, Endianness::Little)
         .header_version(0x01)
-        .abi(ElfAbi::Linux)
+        .abi(Abi::Linux)
         .abi_version(0x01)
-        .file_type(ELFFileType::Executable)
-        .arch(ELFArch::X86_64)
+        .file_type(FileType::Executable)
+        .arch(Arch::X86_64)
         .version(0x0000FF01)
-        .entry_point(ELFWord::Word64(0x0000008000000000))
-        .program_header_start(ELFWord::Word64(0x0000000040000000))
-        .section_header_start(ELFWord::Word64(0x0000000080000000))
+        .entry_point(Word::Word64(0x0000008000000000))
+        .program_header_start(Word::Word64(0x0000000000000040))
+        .section_header_start(Word::Word64(0x0000000080000000))
         .flags(0x57103AFF)
-        .program_header_entry_size(0x0040)
-        .program_header_entry_count(0x0030)
+        .program_header_entry_size(0x0038)
+        .program_header_entry_count(0x0001)
         .section_header_entry_size(0x8000)
         .section_header_entry_count(0x0040)
         .section_names_index(0x002F);
@@ -304,60 +345,60 @@ mod test {
     #[test]
     fn test_header_32_ok() {
         let test_data = VALID_HEADER_DATA_32;
-        let result = ELFHeader::from_bytes(&test_data);
+        let result = Header::from_bytes(&test_data);
         assert_eq!(result, Ok(VALID_HEADER_32.clone()));
     }
 
     #[test]
     fn test_header_64_ok() {
         let test_data = VALID_HEADER_DATA_64;
-        let result = ELFHeader::from_bytes(&test_data);
+        let result = Header::from_bytes(&test_data);
         assert_eq!(result, Ok(VALID_HEADER_64.clone()));
     }
 
     #[test]
     fn test_header_err_slice_len() {
         let test_data = [];
-        let result = ELFHeader::from_bytes(&test_data);
-        assert_eq!(result, Err(ELFParseError::InvalidHeaderLength(0)));
+        let result = Header::from_bytes(&test_data);
+        assert_eq!(result, Err(ParseError::InvalidHeaderLength(0)));
     }
 
     #[test]
     fn test_header_err_word32_len() {
         let test_data = &VALID_HEADER_DATA_32[..50];
-        let result = ELFHeader::from_bytes(test_data);
-        assert_eq!(result, Err(ELFParseError::InvalidHeaderLength(50)));
+        let result = Header::from_bytes(test_data);
+        assert_eq!(result, Err(ParseError::InvalidHeaderLength(50)));
     }
 
     #[test]
     fn test_header_err_word64_len() {
         let test_data = &VALID_HEADER_DATA_64[..55];
-        let result = ELFHeader::from_bytes(test_data);
-        assert_eq!(result, Err(ELFParseError::InvalidHeaderLength(55)));
+        let result = Header::from_bytes(test_data);
+        assert_eq!(result, Err(ParseError::InvalidHeaderLength(55)));
     }
 
     #[test]
     fn test_header_err_magic() {
         let mut test_data = VALID_HEADER_DATA_64.clone();
         test_data[2] = 0x4D;
-        let result = ELFHeader::from_bytes(&test_data);
-        assert_eq!(result, Err(ELFParseError::NoELF(u32::to_le(0x464D457F))));
+        let result = Header::from_bytes(&test_data);
+        assert_eq!(result, Err(ParseError::NoELF(u32::to_le(0x464D457F))));
     }
 
     #[test]
     fn test_header_err_word_width() {
         let mut test_data = VALID_HEADER_DATA_64.clone();
         test_data[4] = 0x03;
-        let result = ELFHeader::from_bytes(&test_data);
-        assert_eq!(result, Err(ELFParseError::InvalidWordWidth(0x03)));
+        let result = Header::from_bytes(&test_data);
+        assert_eq!(result, Err(ParseError::InvalidWordWidth(0x03)));
     }
 
     #[test]
     fn test_header_err_endianness() {
         let mut test_data = VALID_HEADER_DATA_64.clone();
         test_data[5] = 0xFF;
-        let result = ELFHeader::from_bytes(&test_data);
-        assert_eq!(result, Err(ELFParseError::InvalidEndianness(0xFF)));
+        let result = Header::from_bytes(&test_data);
+        assert_eq!(result, Err(ParseError::InvalidEndianness(0xFF)));
     }
 
     #[test]
@@ -365,7 +406,105 @@ mod test {
         let mut test_data = VALID_HEADER_DATA_64.clone();
         test_data[16] = 0x69;
         test_data[17] = 0x42;
-        let result = ELFHeader::from_bytes(&test_data);
-        assert_eq!(result, Err(ELFParseError::InvalidFileType(u16::to_le(0x4269))));
+        let result = Header::from_bytes(&test_data);
+        assert_eq!(result, Err(ParseError::InvalidFileType(u16::to_le(0x4269))));
+    }
+
+    static VALID_PHEADER_DATA_32_LITTLE: [u8;32] = [
+        // segment type
+        0x06, 0x00, 0x00, 0x00, // header segment
+        // offset
+        0x34, 0x00, 0x00, 0x00,
+        // virtual address
+        0x00, 0x00, 0x5C, 0x44,
+        // physical address
+        0x00, 0x00, 0x00, 0x00,
+        // filesize
+        0x00, 0x00, 0x00, 0x00,
+        // memsize
+        0x00, 0x00, 0x00, 0x00,
+        // flags
+        0xE3, 0x77, 0x04, 0xF1,
+        // alignment
+        0x01, 0x00, 0x00, 0x00
+    ];
+
+    static VALID_PHEADER_DATA_64_LITTLE: [u8; 56] = [
+        // segment type
+        0x06, 0x00, 0x00, 0x00, // header segment
+        // flags
+        0xE3, 0x77, 0x04, 0xF1,
+        // offset
+        0x40, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+        // virtual address
+        0x00, 0x00, 0x5C, 0x44, 0x00, 0x00, 0x22, 0x00,
+        // physical address
+        0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+        // filesize
+        0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+        // memsize
+        0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0xF3,
+        // alignment
+        0x01, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00
+    ];
+
+    static VALID_PHEADER_32: ProgramHeader = ProgramHeader::new(
+        ProgramHeaderSegmentType::HeaderSegment,
+        Word::Word32(0x00000034),
+        Word::Word32(0x445C0000),
+        Word::Word32(0x00000000),
+        Word::Word32(0x00000000),
+        Word::Word32(0x00000000),
+        0xF10477E3,
+        Word::Word32(0x00000001)
+    );
+
+    static VALID_PHEADER_64: ProgramHeader = ProgramHeader::new(
+        ProgramHeaderSegmentType::HeaderSegment,
+        Word::Word64(0x0000000000000040),
+        Word::Word64(0x00220000445C0000),
+        Word::Word64(0x0000000000000000),
+        Word::Word64(0x0000000000000000),
+        Word::Word64(0xF300000000000000),
+        0xF10477E3,
+        Word::Word64(0x0000000000000001)
+    );
+
+    #[test]
+    fn test_pheader_32_ok() {
+        let test_data = VALID_PHEADER_DATA_32_LITTLE.clone();
+        let result = ProgramHeader::from_bytes(&test_data, WordWidth::Width32, Endianness::Little);
+        assert_eq!(result, Ok(VALID_PHEADER_32.clone()));
+    }
+
+    #[test]
+    fn test_pheader_64_ok() {
+        let test_data = VALID_PHEADER_DATA_64_LITTLE.clone();
+        let result = ProgramHeader::from_bytes(&test_data, WordWidth::Width64, Endianness::Little);
+        assert_eq!(result, Ok(VALID_PHEADER_64.clone()));
+    }
+
+    #[test]
+    fn test_pheader_err_type() {
+        let mut test_data = VALID_PHEADER_DATA_32_LITTLE.clone();
+        test_data[0] = 0x08;
+        let result = ProgramHeader::from_bytes(&test_data, WordWidth::Width32, Endianness::Little);
+        assert_eq!(result, Err(ParseError::InvalidProgHeaderType(0x00000008)));
+    }
+
+    #[test]
+    fn test_pheader_err_align() {
+        let mut test_data = VALID_PHEADER_DATA_32_LITTLE.clone();
+        test_data[28] = 0x0F;
+        let result = ProgramHeader::from_bytes(&test_data, WordWidth::Width32, Endianness::Little);
+        assert_eq!(result, Err(ParseError::InvalidAlignment(0x000000000000000F)));
+    }
+
+    #[test]
+    fn test_pheader_err_addr() {
+        let mut test_data = VALID_PHEADER_DATA_32_LITTLE.clone();
+        test_data[28] = 0x02;
+        let result = ProgramHeader::from_bytes(&test_data, WordWidth::Width32, Endianness::Little);
+        assert_eq!(result, Err(ParseError::InvalidVirtualAddress(Word::Word32(0x445C0000))));
     }
 }

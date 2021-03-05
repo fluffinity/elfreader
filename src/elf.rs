@@ -1,5 +1,7 @@
+use std::fmt::{LowerHex, Formatter, UpperHex, Binary, Debug};
+
 #[derive(Debug, Eq, PartialEq, Copy, Clone)]
-pub enum ELFFileType {
+pub enum FileType {
     None,
     Relocatable,
     Executable,
@@ -9,19 +11,19 @@ pub enum ELFFileType {
 }
 
 #[derive(Debug, Eq, PartialEq, Copy, Clone)]
-pub enum ELFWordWidth {
+pub enum WordWidth {
     Width32,
     Width64
 }
 
 #[derive(Debug, Eq, PartialEq, Copy, Clone)]
-pub enum ELFEndianness {
+pub enum Endianness {
     Little,
     Big
 }
 
 #[derive(Debug, Eq, PartialEq, Copy, Clone)]
-pub enum ElfAbi {
+pub enum Abi {
     SysV,
     HpUx,
     NetBSD,
@@ -44,7 +46,7 @@ pub enum ElfAbi {
 }
 
 #[derive(Debug, Eq, PartialEq, Copy, Clone)]
-pub enum ELFArch {
+pub enum Arch {
     Unspecified,
     WE32100,
     Sparc,
@@ -73,16 +75,79 @@ pub enum ELFArch {
     Unknown
 }
 
-#[derive(Debug, Eq, PartialEq, Copy, Clone, Ord, PartialOrd)]
-pub enum ELFWord {
+#[derive(Eq, PartialEq, Copy, Clone, Ord, PartialOrd)]
+pub enum Word {
     Word32(u32),
     Word64(u64)
 }
 
-impl ELFFileType {
+#[derive(Debug, PartialEq, Clone)]
+pub struct Header {
+    word_width: WordWidth,
+    endianness: Endianness,
+    header_version: u8,
+    os_abi: Abi,
+    abi_version: u8,
+    file_type: FileType,
+    arch: Arch,
+    version: u32,
+    entry_point: Word,
+    program_header_start: Word,
+    section_header_start: Word,
+    flags: u32,
+    pheader_entry_size: u16,
+    pheader_entries: u16,
+    sheader_entry_size: u16,
+    sheader_entries: u16,
+    section_names_index: u16
+}
 
-    fn from_u16(i: u16) -> Result<ELFFileType, ELFParseError> {
-        use ELFFileType::*;
+#[derive(Debug, Eq, PartialEq, Copy, Clone)]
+pub enum ProgramHeaderSegmentType {
+    Null,
+    Load,
+    Dynamic,
+    Interp,
+    Note,
+    SharedLib,
+    HeaderSegment,
+    ThreadLocalStorage,
+    OSSpecific(u32),
+    ProcessorSpecific(u32)
+}
+
+#[derive(Debug, PartialEq, Clone)]
+pub struct ProgramHeader {
+    typ: ProgramHeaderSegmentType,
+    flags: u32,
+    offset: Word,
+    vaddress: Word,
+    paddress: Word,
+    filesize: Word,
+    memsize: Word,
+    alignment: Word
+}
+
+#[derive(Debug, Eq, PartialEq, Copy, Clone)]
+pub enum ParseError {
+    InvalidHeaderLength(usize),
+    NoELF(u32),
+    InvalidWordWidth(u8),
+    InvalidEndianness(u8),
+    InvalidFileType(u16),
+    InvalidProgHeaderLength(usize),
+    InvalidProgHeaderType(u32),
+    InvalidAlignment(u64),
+    InvalidVirtualAddress(Word),
+    InsufficientPartLength(usize)
+}
+
+pub type ELFResult<T> = Result<T, ParseError>;
+
+impl FileType {
+
+    fn from_u16(i: u16) -> ELFResult<FileType> {
+        use FileType::*;
         match i {
             0x0000 => Ok(None),
             0x0001 => Ok(Relocatable),
@@ -90,47 +155,47 @@ impl ELFFileType {
             0x0003 => Ok(Shared),
             0x0004 => Ok(Core),
             _ if i >= 0xff00 => Ok(Specific(i)),
-            _ => Err(ELFParseError::InvalidFileType(i))
+            _ => Err(ParseError::InvalidFileType(i))
         }
     }
 
-    pub(crate) fn from_bytes(bytes: &[u8], endianness: ELFEndianness) -> Result<ELFFileType, ELFParseError> {
+    pub(crate) fn from_bytes(bytes: &[u8], endianness: Endianness) -> ELFResult<FileType> {
         if bytes.len() < 2 {
-            Err(ELFParseError::InsufficientPartLength(bytes.len()))
+            Err(ParseError::InsufficientPartLength(bytes.len()))
         } else {
-            ELFFileType::from_u16(u16::from_bytes(bytes, endianness))
+            FileType::from_u16(u16::from_bytes(bytes, endianness))
         }
     }
 }
 
-impl ELFWordWidth {
+impl WordWidth {
 
-    pub(crate) fn from_byte(b: u8) -> Result<ELFWordWidth, ELFParseError> {
-        use ELFWordWidth::*;
+    pub(crate) fn from_byte(b: u8) -> ELFResult<WordWidth> {
+        use WordWidth::*;
         match b {
             0x01 => Ok(Width32),
             0x02 => Ok(Width64),
-            _ => Err(ELFParseError::InvalidWordWidth(b))
+            _ => Err(ParseError::InvalidWordWidth(b))
         }
     }
 }
 
-impl ELFEndianness {
+impl Endianness {
 
-    pub(crate) fn from_byte(b: u8) -> Result<ELFEndianness, ELFParseError> {
-        use ELFEndianness::*;
+    pub(crate) fn from_byte(b: u8) -> ELFResult<Endianness> {
+        use Endianness::*;
         match b {
             0x01 => Ok(Little),
             0x02 => Ok(Big),
-            _ => Err(ELFParseError::InvalidEndianness(b))
+            _ => Err(ParseError::InvalidEndianness(b))
         }
     }
 }
 
-impl ElfAbi {
+impl Abi {
 
-    pub(crate) fn from_byte(b: u8) -> ElfAbi {
-        use ElfAbi::*;
+    pub(crate) fn from_byte(b: u8) -> Abi {
+        use Abi::*;
         match b {
             0x00 => SysV,
             0x01 => HpUx,
@@ -155,10 +220,10 @@ impl ElfAbi {
     }
 }
 
-impl ELFArch {
+impl Arch {
 
-    fn from_u16(i: u16) -> ELFArch {
-        use ELFArch::*;
+    fn from_u16(i: u16) -> Arch {
+        use Arch::*;
         match i {
             0x0000 => Unspecified,
             0x0001 => WE32100,
@@ -189,84 +254,118 @@ impl ELFArch {
         }
     }
 
-    pub(crate) fn from_bytes(bytes: &[u8], endianness: ELFEndianness) -> Result<ELFArch, ELFParseError> {
+    pub(crate) fn from_bytes(bytes: &[u8], endianness: Endianness) -> ELFResult<Arch> {
         // allow larger slices as well. The number of read bytes is known statically
         if bytes.len() < 2 {
-            Err(ELFParseError::InsufficientPartLength(bytes.len()))
+            Err(ParseError::InsufficientPartLength(bytes.len()))
         } else {
-            Ok(ELFArch::from_u16(u16::from_bytes(bytes, endianness)))
+            Ok(Arch::from_u16(u16::from_bytes(bytes, endianness)))
         }
     }
 }
 
-impl ELFWord {
+impl ProgramHeaderSegmentType {
 
-    pub(crate) fn from_bytes(bytes: &[u8], word_width: ELFWordWidth, endianness: ELFEndianness) -> Result<(ELFWord, usize), ELFParseError> {
+    fn from_u32(u: u32) -> ELFResult<ProgramHeaderSegmentType> {
+        use ProgramHeaderSegmentType::*;
+        match u {
+            0x00000000 => Ok(Null),
+            0x00000001 => Ok(Load),
+            0x00000002 => Ok(Dynamic),
+            0x00000003 => Ok(Interp),
+            0x00000004 => Ok(Note),
+            0x00000005 => Ok(SharedLib),
+            0x00000006 => Ok(HeaderSegment),
+            0x00000007 => Ok(ThreadLocalStorage),
+            i if 0x60000000 <= i && i <= 0x6FFFFFFF => Ok(OSSpecific(i)),
+            i if 0x70000000 <= i && i <= 0x7FFFFFFF => Ok(ProcessorSpecific(i)),
+            _ => Err(ParseError::InvalidProgHeaderType(u))
+        }
+    }
+
+    pub(crate) fn from_bytes(bytes: &[u8], endianness: Endianness) -> ELFResult<ProgramHeaderSegmentType> {
+        if bytes.len() < 4 {
+            Err(ParseError::InsufficientPartLength(bytes.len()))
+        } else{
+            ProgramHeaderSegmentType::from_u32(u32::from_bytes(bytes, endianness))
+        }
+    }
+}
+
+impl Word {
+
+    pub(crate) fn from_bytes(bytes: &[u8], word_width: WordWidth, endianness: Endianness) -> ELFResult<(Word, usize)> {
         match word_width {
-            ELFWordWidth::Width32 => {
+            WordWidth::Width32 => {
                 if bytes.len() < 4 {
-                    Err(ELFParseError::InsufficientPartLength(bytes.len()))
+                    Err(ParseError::InsufficientPartLength(bytes.len()))
                 } else {
-                    Ok((ELFWord::Word32(u32::from_bytes(bytes, endianness)), 4))
+                    Ok((Word::Word32(u32::from_bytes(bytes, endianness)), 4))
                 }
             },
-            ELFWordWidth::Width64 => {
+            WordWidth::Width64 => {
                 if bytes.len() < 8 {
-                    Err(ELFParseError::InsufficientPartLength(bytes.len()))
+                    Err(ParseError::InsufficientPartLength(bytes.len()))
                 } else {
-                    Ok((ELFWord::Word64(u64::from_bytes(bytes, endianness)), 8))
+                    Ok((Word::Word64(u64::from_bytes(bytes, endianness)), 8))
                 }
             }
         }
     }
 }
 
-#[derive(Debug, PartialEq, Clone)]
-pub struct ELFHeader {
-    word_width: ELFWordWidth,
-    endianness: ELFEndianness,
-    header_version: u8,
-    os_abi: ElfAbi,
-    abi_version: u8,
-    file_type: ELFFileType,
-    arch: ELFArch,
-    version: u32,
-    entry_point: ELFWord,
-    program_header_start: ELFWord,
-    section_header_start: ELFWord,
-    flags: u32,
-    pheader_entry_size: u16,
-    pheader_entries: u16,
-    sheader_entry_size: u16,
-    sheader_entries: u16,
-    section_names_index: u16
+impl Debug for Word {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        match *self {
+            Word::Word32(u) => write!(f, "Word32({:#x})", u),
+            Word::Word64(u) => write!(f, "Word64({:#x})", u)
+        }
+    }
 }
 
-#[derive(Debug, Eq, PartialEq, Copy, Clone)]
-pub enum ELFParseError {
-    InvalidHeaderLength(usize),
-    NoELF(u32),
-    InvalidWordWidth(u8),
-    InvalidEndianness(u8),
-    InvalidFileType(u16),
-    InsufficientPartLength(usize)
+impl LowerHex for Word {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        match *self {
+            Word::Word32(u) => LowerHex::fmt(&u, f),
+            Word::Word64(u) => LowerHex::fmt(&u, f)
+        }
+    }
 }
 
-impl ELFHeader {
+impl UpperHex for Word {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        match *self {
+            Word::Word32(u) => UpperHex::fmt(&u, f),
+            Word::Word64(u) => UpperHex::fmt(&u, f)
+        }
+    }
+}
 
-    pub(crate) const fn minimal(word_width: ELFWordWidth, endianness: ELFEndianness) -> Self {
+impl Binary for Word {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        match *self {
+            Word::Word32(u) => Binary::fmt(&u, f),
+            Word::Word64(u) => Binary::fmt(&u, f)
+        }
+    }
+}
+
+impl Header {
+
+    #[allow(dead_code)]
+    pub(crate) const fn minimal(word_width: WordWidth, endianness: Endianness) -> Self {
         let word = match word_width {
-            ELFWordWidth::Width32 => ELFWord::Word32(0),
-            _ => ELFWord::Word64(0)
+            WordWidth::Width32 => Word::Word32(0),
+            _ => Word::Word64(0)
         };
-        ELFHeader {
+        Header {
             word_width,
             endianness,
             header_version: 0,
-            os_abi: ElfAbi::Unknown,
+            os_abi: Abi::Unknown,
             abi_version: 0,
-            file_type: ELFFileType::None,
-            arch: ELFArch::Unspecified,
+            file_type: FileType::None,
+            arch: Arch::Unspecified,
             version: 0,
             entry_point: word,
             program_header_start: word,
@@ -280,118 +379,133 @@ impl ELFHeader {
         }
     }
 
+    #[allow(dead_code)]
     pub(crate) const fn header_version(mut self, header_version: u8) -> Self {
         self.header_version = header_version;
         self
     }
 
-    pub(crate) const fn abi(mut self, os_abi: ElfAbi) -> Self {
+    #[allow(dead_code)]
+    pub(crate) const fn abi(mut self, os_abi: Abi) -> Self {
         self.os_abi = os_abi;
         self
     }
 
+    #[allow(dead_code)]
     pub(crate) const fn abi_version(mut self, abi_version: u8) -> Self {
         self.abi_version = abi_version;
         self
     }
 
-    pub(crate) const fn file_type(mut self, file_type: ELFFileType) -> Self {
+    #[allow(dead_code)]
+    pub(crate) const fn file_type(mut self, file_type: FileType) -> Self {
         self.file_type = file_type;
         self
     }
 
-    pub(crate) const fn arch(mut self, arch: ELFArch) -> Self {
+    #[allow(dead_code)]
+    pub(crate) const fn arch(mut self, arch: Arch) -> Self {
         self.arch = arch;
         self
     }
 
+    #[allow(dead_code)]
     pub(crate) const fn version(mut self, version: u32) -> Self {
         self.version = version;
         self
     }
 
-    pub(crate) const fn entry_point(mut self, entry_point: ELFWord) -> Self {
+    #[allow(dead_code)]
+    pub(crate) const fn entry_point(mut self, entry_point: Word) -> Self {
         self.entry_point = entry_point;
         self
     }
 
-    pub(crate) const fn program_header_start(mut self, word: ELFWord) -> Self {
+    #[allow(dead_code)]
+    pub(crate) const fn program_header_start(mut self, word: Word) -> Self {
         self.program_header_start = word;
         self
     }
 
-    pub(crate) const fn section_header_start(mut self, word: ELFWord) -> Self {
+    #[allow(dead_code)]
+    pub(crate) const fn section_header_start(mut self, word: Word) -> Self {
         self.section_header_start = word;
         self
     }
 
+    #[allow(dead_code)]
     pub(crate) const fn flags(mut self, flags: u32) -> Self {
         self.flags = flags;
         self
     }
 
+    #[allow(dead_code)]
     pub(crate) const fn program_header_entry_size(mut self, size: u16) -> Self {
         self.pheader_entry_size = size;
         self
     }
 
+    #[allow(dead_code)]
     pub(crate) const fn program_header_entry_count(mut self, count: u16) -> Self {
         self.pheader_entries = count;
         self
     }
 
+    #[allow(dead_code)]
     pub(crate) const fn section_header_entry_size(mut self, size: u16) -> Self {
         self.sheader_entry_size = size;
         self
     }
 
+    #[allow(dead_code)]
     pub(crate) const fn section_header_entry_count(mut self, count: u16) -> Self {
         self.sheader_entries = count;
         self
     }
 
+    #[allow(dead_code)]
     pub(crate) const fn section_names_index(mut self, index: u16) -> Self {
         self.section_names_index = index;
         self
     }
 
-    pub fn from_bytes(bytes: &[u8]) -> Result<ELFHeader, ELFParseError> {
+    pub fn from_bytes(bytes: &[u8]) -> ELFResult<Header> {
         // we need at least 52 bytes to parse an ELF header. This is the case for 32-bit ELF files
-        ELFHeader::check_length(52, bytes.len())?;
+        Header::check_length(52, bytes.len())?;
 
-        ELFHeader::parse_magic(bytes)?;
+        Header::parse_magic(bytes)?;
 
-        let word_width = ELFWordWidth::from_byte(bytes[4])?;
+        let word_width = WordWidth::from_byte(bytes[4])?;
 
         // now we can check whether we have enough bytes to parse the header
         let required_bytes = match word_width {
-            ELFWordWidth::Width32 => 52,
-            ELFWordWidth::Width64 => 64,
+            WordWidth::Width32 => 52,
+            WordWidth::Width64 => 64,
         };
-        ELFHeader::check_length(required_bytes, bytes.len())?;
+        Header::check_length(required_bytes, bytes.len())?;
 
-        let endianness = ELFEndianness::from_byte(bytes[5])?;
+        let endianness = Endianness::from_byte(bytes[5])?;
         let header_version = bytes[6];
-        let os_abi = ElfAbi::from_byte(bytes[7]);
+        let os_abi = Abi::from_byte(bytes[7]);
         let abi_version = bytes[8];
 
         // the offset given by the padding bytes which are the bytes 9-15
         let offset = 16;
-        let file_type = ELFFileType::from_bytes(&bytes[offset..offset +2], endianness)?;
-        let arch = ELFArch::from_bytes(&bytes[offset +2..offset +4], endianness)?;
+        let file_type = FileType::from_bytes(&bytes[offset..offset +2], endianness)?;
+        let arch = Arch::from_bytes(&bytes[offset +2..offset +4], endianness)?;
         let version = u32::from_bytes(&bytes[offset +4..offset +8], endianness);
 
         // now we have fields of varying size so we use a mutable offset to track the current position
         // this way we keep the slicing short and simple
         let mut byte_offset = offset + 8;
 
-        let (entry_point, read) = ELFWord::from_bytes(&bytes[byte_offset..], word_width, endianness)?;
+        let (entry_point, read) = Word::from_bytes(&bytes[byte_offset..], word_width, endianness)?;
         byte_offset += read;
 
-        let (program_header_start, read) = ELFWord::from_bytes(&bytes[byte_offset..], word_width, endianness)?;
+        let (program_header_start, read) = Word::from_bytes(&bytes[byte_offset..], word_width, endianness)?;
         byte_offset += read;
 
-        let (section_header_start, read) = ELFWord::from_bytes(&bytes[byte_offset..], word_width, endianness)?;
+        let (section_header_start, read) = Word::from_bytes(&bytes[byte_offset..], word_width, endianness)?;
         byte_offset += read;
 
         let offset = byte_offset;
@@ -399,7 +513,7 @@ impl ELFHeader {
         let header_size = u16::from_bytes(&bytes[offset+4..offset+6], endianness);
 
         if required_bytes != header_size as usize {
-            return Err(ELFParseError::InvalidHeaderLength(header_size as usize));
+            return Err(ParseError::InvalidHeaderLength(header_size as usize));
         }
 
         let pheader_entry_size = u16::from_bytes(&bytes[offset+6..offset+8], endianness);
@@ -409,7 +523,7 @@ impl ELFHeader {
         let section_names_index = u16::from_bytes(&bytes[offset+14..offset+16], endianness);
 
         Ok(
-            ELFHeader {
+            Header {
                 word_width,
                 endianness,
                 header_version,
@@ -431,70 +545,149 @@ impl ELFHeader {
         )
     }
 
-    fn check_length(minimum: usize, actual: usize) -> Result<(), ELFParseError> {
+    fn check_length(minimum: usize, actual: usize) -> ELFResult<()> {
         if actual < minimum {
-            Err(ELFParseError::InvalidHeaderLength(actual))
+            Err(ParseError::InvalidHeaderLength(actual))
         } else {
             Ok(())
         }
     }
 
-    fn parse_magic(bytes: &[u8]) -> Result<(), ELFParseError> {
+    fn parse_magic(bytes: &[u8]) -> ELFResult<()> {
         let magic_bytes = get_u32_bytes(bytes);
         let magic = u32::from_le_bytes(magic_bytes);
-        if !is_valid_magic(magic_bytes) || bytes[0] != 0x7F {
-            Err(ELFParseError::NoELF(magic))
+        if !Header::is_valid_magic(magic_bytes) || bytes[0] != 0x7F {
+            Err(ParseError::NoELF(magic))
         } else {
             Ok(())
         }
     }
 
+    pub(crate) fn is_valid_magic(magic: [u8; 4]) -> bool {
+        let magic_bytes = &magic[1..];
+        (magic[0] == 0x7F) && magic_bytes.eq(&ELF_ASCII)
+    }
 }
-
 
 // ASCII for "ELF"
 static ELF_ASCII: [u8;3] = [0x45, 0x4C, 0x46];
 
-pub(crate) fn is_valid_magic(magic: [u8; 4]) -> bool {
-    let magic_bytes = &magic[1..];
-    (magic[0] == 0x7F) && magic_bytes.eq(&ELF_ASCII)
+impl ProgramHeader {
+
+    pub(crate) const fn new(typ: ProgramHeaderSegmentType, offset: Word, vaddress: Word, paddress: Word,
+    filesize: Word, memsize: Word, flags: u32, alignment: Word) -> ProgramHeader {
+        ProgramHeader {
+            typ,
+            offset,
+            vaddress,
+            paddress,
+            filesize,
+            memsize,
+            flags,
+            alignment
+        }
+    }
+
+    pub(crate) fn from_bytes(bytes: &[u8], word_width: WordWidth, endianness: Endianness) -> ELFResult<ProgramHeader> {
+        ProgramHeader::check_length(32, bytes.len())?;
+        let typ = ProgramHeaderSegmentType::from_bytes(bytes, endianness)?;
+        // offsets is an array of offsets in bytes for the fields of the program header
+        // the fields are [offset, vaddress, paddress, filesize, memsize, flags, alignment]
+        let (offsets, size) = match word_width {
+            WordWidth::Width32 => ([4, 8, 12, 16, 20, 24, 28], 32),
+            WordWidth::Width64 => ([8, 16, 24, 32, 40, 4, 48], 54)
+        };
+        ProgramHeader::check_length(size, bytes.len())?;
+        let (offset, _) = Word::from_bytes(&bytes[offsets[0]..], word_width, endianness)?;
+        let (vaddress, _) = Word::from_bytes(&bytes[offsets[1]..], word_width, endianness)?;
+        let (paddress, _) = Word::from_bytes(&bytes[offsets[2]..], word_width, endianness)?;
+        let (filesize, _) = Word::from_bytes(&bytes[offsets[3]..], word_width, endianness)?;
+        let (memsize, _) = Word::from_bytes(&bytes[offsets[4]..], word_width, endianness)?;
+        let flags = u32::from_bytes(&bytes[offsets[5]..], endianness);
+        let (alignment, _) = Word::from_bytes(&bytes[offsets[6]..], word_width, endianness)?;
+        ProgramHeader::validate_vaddr(offset, vaddress, alignment)?;
+        Ok(ProgramHeader {
+            typ,
+            flags,
+            offset,
+            vaddress,
+            paddress,
+            filesize,
+            memsize,
+            alignment
+        })
+    }
+
+    fn check_length(expected: usize, actual: usize) -> ELFResult<()> {
+        if actual < expected {
+            Err(ParseError::InvalidProgHeaderLength(actual))
+        } else {
+            Ok(())
+        }
+    }
+
+    fn validate_vaddr(offset: Word, addr: Word, align: Word) -> ELFResult<()> {
+        let align = match align {
+            Word::Word64(u) => u,
+            Word::Word32(u) => u as u64
+        };
+        if align == 0 || align == 1 {
+            Ok(())
+        } else if !align.is_power_of_two() {
+            Err(ParseError::InvalidAlignment(align))
+        } else {
+            let offset = match offset {
+                Word::Word64(u) => u,
+                Word::Word32(u) => u as u64
+            };
+            let normalized_addr = match addr {
+                Word::Word64(u) => u,
+                Word::Word32(u) => u as u64
+            };
+            if normalized_addr == offset % align {
+                Ok(())
+            } else {
+                Err(ParseError::InvalidVirtualAddress(addr))
+            }
+        }
+    }
 }
 
 
 //TODO maybe reimplement this facility with macros to ensure the correct number of bytes at compile time
 pub(crate) trait FromBytesEndianned {
-    fn from_bytes(bytes: &[u8], endianness: ELFEndianness) -> Self;
+    fn from_bytes(bytes: &[u8], endianness: Endianness) -> Self;
 }
 
 impl FromBytesEndianned for u16 {
-    fn from_bytes(bytes: &[u8], endianness: ELFEndianness) -> Self {
+    fn from_bytes(bytes: &[u8], endianness: Endianness) -> Self {
         assert!(bytes.len() >= 2);
         let bytes = get_u16_bytes(bytes);
         match endianness{
-            ELFEndianness::Little => u16::from_le_bytes(bytes),
-            ELFEndianness::Big => u16::from_be_bytes(bytes)
+            Endianness::Little => u16::from_le_bytes(bytes),
+            Endianness::Big => u16::from_be_bytes(bytes)
         }
     }
 }
 
 impl FromBytesEndianned for u32 {
-    fn from_bytes(bytes: &[u8], endianness: ELFEndianness) -> Self {
+    fn from_bytes(bytes: &[u8], endianness: Endianness) -> Self {
         assert!(bytes.len() >= 4);
         let bytes = get_u32_bytes(bytes);
         match endianness{
-            ELFEndianness::Little => u32::from_le_bytes(bytes),
-            ELFEndianness::Big => u32::from_be_bytes(bytes)
+            Endianness::Little => u32::from_le_bytes(bytes),
+            Endianness::Big => u32::from_be_bytes(bytes)
         }
     }
 }
 
 impl FromBytesEndianned for u64 {
-    fn from_bytes(bytes: &[u8], endianness: ELFEndianness) -> Self {
+    fn from_bytes(bytes: &[u8], endianness: Endianness) -> Self {
         assert!(bytes.len() >= 8);
         let bytes = get_u64_bytes(bytes);
         match endianness {
-            ELFEndianness::Little => u64::from_le_bytes(bytes),
-            ELFEndianness::Big => u64::from_be_bytes(bytes)
+            Endianness::Little => u64::from_le_bytes(bytes),
+            Endianness::Big => u64::from_be_bytes(bytes)
         }
     }
 }
