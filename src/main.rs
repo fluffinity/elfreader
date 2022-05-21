@@ -6,7 +6,7 @@ mod test_elf_structs_from_bytes;
 mod test_from_bytes_endianned;
 use elf::Header;
 
-fn main() -> Result<(), i32>{
+fn main() -> Result<(), i32> {
     println!("Hello, world!");
     let args: Vec<String> = std::env::args().collect();
     if args.len() < 2 {
