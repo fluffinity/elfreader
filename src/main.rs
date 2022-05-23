@@ -74,15 +74,6 @@ fn main() -> Result<(), i32> {
         return Err(1);
     }
     let program_headers: Vec<_> = program_headers.into_iter().map(|entry| entry.expect("checked for Err")).collect();
-    let program_header = ProgramHeader::parse_bytes(buf.as_mut_slice(), header.word_width(), header.endianness());
-    if let Err(err) = program_header {
-        eprint!("error parsing program headers. Reason:");
-        eprintln!("{:?}", err);
-        return Err(1)
-    }
-    let program_header = program_header.expect("checked for Err");
-    println!("successfully read program headers.");
-    println!("{:?}", program_header);
     println!("program headers:");
     program_headers.iter().for_each(|pheader| {
         println!("{:?}", pheader);
