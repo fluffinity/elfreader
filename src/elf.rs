@@ -146,7 +146,7 @@ pub type ELFResult<T> = Result<T, ParseError>;
 
 impl FileType {
 
-    fn from_u16(i: u16) -> ELFResult<FileType> {
+    fn parse_u16(i: u16) -> ELFResult<FileType> {
         use FileType::*;
         match i {
             0x0000 => Ok(None),
@@ -159,18 +159,18 @@ impl FileType {
         }
     }
 
-    pub(crate) fn from_bytes(bytes: &[u8], endianness: Endianness) -> ELFResult<FileType> {
+    pub(crate) fn parse_bytes(bytes: &[u8], endianness: Endianness) -> ELFResult<FileType> {
         if bytes.len() < 2 {
             Err(ParseError::InsufficientPartLength(bytes.len()))
         } else {
-            FileType::from_u16(u16::from_bytes(bytes, endianness))
+            FileType::parse_u16(u16::from_bytes(bytes, endianness))
         }
     }
 }
 
 impl WordWidth {
 
-    pub(crate) fn from_byte(b: u8) -> ELFResult<WordWidth> {
+    pub(crate) fn parse_byte(b: u8) -> ELFResult<WordWidth> {
         use WordWidth::*;
         match b {
             0x01 => Ok(Width32),
@@ -182,7 +182,7 @@ impl WordWidth {
 
 impl Endianness {
 
-    pub(crate) fn from_byte(b: u8) -> ELFResult<Endianness> {
+    pub(crate) fn parse_byte(b: u8) -> ELFResult<Endianness> {
         use Endianness::*;
         match b {
             0x01 => Ok(Little),
@@ -254,7 +254,7 @@ impl Arch {
         }
     }
 
-    pub(crate) fn from_bytes(bytes: &[u8], endianness: Endianness) -> ELFResult<Arch> {
+    pub(crate) fn parse_bytes(bytes: &[u8], endianness: Endianness) -> ELFResult<Arch> {
         // allow larger slices as well. The number of read bytes is known statically
         if bytes.len() < 2 {
             Err(ParseError::InsufficientPartLength(bytes.len()))
@@ -266,7 +266,7 @@ impl Arch {
 
 impl ProgramHeaderSegmentType {
 
-    fn from_u32(u: u32) -> ELFResult<ProgramHeaderSegmentType> {
+    fn parse_u32(u: u32) -> ELFResult<ProgramHeaderSegmentType> {
         use ProgramHeaderSegmentType::*;
         match u {
             0x00000000 => Ok(Null),
@@ -283,31 +283,31 @@ impl ProgramHeaderSegmentType {
         }
     }
 
-    pub(crate) fn from_bytes(bytes: &[u8], endianness: Endianness) -> ELFResult<ProgramHeaderSegmentType> {
+    pub(crate) fn parse_bytes(bytes: &[u8], endianness: Endianness) -> ELFResult<ProgramHeaderSegmentType> {
         if bytes.len() < 4 {
             Err(ParseError::InsufficientPartLength(bytes.len()))
         } else{
-            ProgramHeaderSegmentType::from_u32(u32::from_bytes(bytes, endianness))
+            ProgramHeaderSegmentType::parse_u32(u32::from_bytes(bytes, endianness))
         }
     }
 }
 
 impl Word {
 
-    pub(crate) fn from_bytes(bytes: &[u8], word_width: WordWidth, endianness: Endianness) -> ELFResult<(Word, usize)> {
+    pub(crate) fn parse_bytes(bytes: &[u8], word_width: WordWidth, endianness: Endianness) -> ELFResult<Word> {
         match word_width {
             WordWidth::Width32 => {
                 if bytes.len() < 4 {
                     Err(ParseError::InsufficientPartLength(bytes.len()))
                 } else {
-                    Ok((Word::Word32(u32::from_bytes(bytes, endianness)), 4))
+                    Ok(Word::Word32(u32::from_bytes(bytes, endianness)))
                 }
             },
             WordWidth::Width64 => {
                 if bytes.len() < 8 {
                     Err(ParseError::InsufficientPartLength(bytes.len()))
                 } else {
-                    Ok((Word::Word64(u64::from_bytes(bytes, endianness)), 8))
+                    Ok(Word::Word64(u64::from_bytes(bytes, endianness)))
                 }
             }
         }
@@ -350,9 +350,9 @@ impl Binary for Word {
     }
 }
 
+#[cfg(test)]
 impl Header {
 
-    #[allow(dead_code)]
     pub(crate) const fn minimal(word_width: WordWidth, endianness: Endianness) -> Self {
         let word = match word_width {
             WordWidth::Width32 => Word::Word32(0),
@@ -379,103 +379,91 @@ impl Header {
         }
     }
 
-    #[allow(dead_code)]
-    pub(crate) const fn header_version(mut self, header_version: u8) -> Self {
+    pub(crate) const fn with_header_version(mut self, header_version: u8) -> Self {
         self.header_version = header_version;
         self
     }
 
-    #[allow(dead_code)]
-    pub(crate) const fn abi(mut self, os_abi: Abi) -> Self {
+    pub(crate) const fn with_abi(mut self, os_abi: Abi) -> Self {
         self.os_abi = os_abi;
         self
     }
 
-    #[allow(dead_code)]
-    pub(crate) const fn abi_version(mut self, abi_version: u8) -> Self {
+    pub(crate) const fn with_abi_version(mut self, abi_version: u8) -> Self {
         self.abi_version = abi_version;
         self
     }
 
-    #[allow(dead_code)]
-    pub(crate) const fn file_type(mut self, file_type: FileType) -> Self {
+    pub(crate) const fn with_file_type(mut self, file_type: FileType) -> Self {
         self.file_type = file_type;
         self
     }
 
-    #[allow(dead_code)]
-    pub(crate) const fn arch(mut self, arch: Arch) -> Self {
+    pub(crate) const fn with_arch(mut self, arch: Arch) -> Self {
         self.arch = arch;
         self
     }
 
-    #[allow(dead_code)]
-    pub(crate) const fn version(mut self, version: u32) -> Self {
+    pub(crate) const fn with_version(mut self, version: u32) -> Self {
         self.version = version;
         self
     }
 
-    #[allow(dead_code)]
-    pub(crate) const fn entry_point(mut self, entry_point: Word) -> Self {
+    pub(crate) const fn with_entry_point(mut self, entry_point: Word) -> Self {
         self.entry_point = entry_point;
         self
     }
 
-    #[allow(dead_code)]
-    pub(crate) const fn program_header_start(mut self, word: Word) -> Self {
+    pub(crate) const fn with_program_header_start(mut self, word: Word) -> Self {
         self.program_header_start = word;
         self
     }
 
-    #[allow(dead_code)]
-    pub(crate) const fn section_header_start(mut self, word: Word) -> Self {
+    pub(crate) const fn with_section_header_start(mut self, word: Word) -> Self {
         self.section_header_start = word;
         self
     }
 
-    #[allow(dead_code)]
-    pub(crate) const fn flags(mut self, flags: u32) -> Self {
+    pub(crate) const fn with_flags(mut self, flags: u32) -> Self {
         self.flags = flags;
         self
     }
 
-    #[allow(dead_code)]
-    pub(crate) const fn program_header_entry_size(mut self, size: u16) -> Self {
+    pub(crate) const fn with_program_header_entry_size(mut self, size: u16) -> Self {
         self.pheader_entry_size = size;
         self
     }
 
-    #[allow(dead_code)]
-    pub(crate) const fn program_header_entry_count(mut self, count: u16) -> Self {
+    pub(crate) const fn with_program_header_entry_count(mut self, count: u16) -> Self {
         self.pheader_entries = count;
         self
     }
 
-    #[allow(dead_code)]
-    pub(crate) const fn section_header_entry_size(mut self, size: u16) -> Self {
+    pub(crate) const fn with_section_header_entry_size(mut self, size: u16) -> Self {
         self.sheader_entry_size = size;
         self
     }
 
-    #[allow(dead_code)]
-    pub(crate) const fn section_header_entry_count(mut self, count: u16) -> Self {
+    pub(crate) const fn with_section_header_entry_count(mut self, count: u16) -> Self {
         self.sheader_entries = count;
         self
     }
 
-    #[allow(dead_code)]
-    pub(crate) const fn section_names_index(mut self, index: u16) -> Self {
+    pub(crate) const fn with_section_names_index(mut self, index: u16) -> Self {
         self.section_names_index = index;
         self
     }
+}
 
-    pub fn from_bytes(bytes: &[u8]) -> ELFResult<Header> {
+impl Header {
+
+    pub fn parse_bytes(bytes: &[u8]) -> ELFResult<Header> {
         // we need at least 52 bytes to parse an ELF header. This is the case for 32-bit ELF files
         Header::check_length(52, bytes.len())?;
 
         Header::parse_magic(bytes)?;
 
-        let word_width = WordWidth::from_byte(bytes[4])?;
+        let word_width = WordWidth::parse_byte(bytes[4])?;
 
         // now we can check whether we have enough bytes to parse the header
         let required_bytes = match word_width {
@@ -484,43 +472,38 @@ impl Header {
         };
         Header::check_length(required_bytes, bytes.len())?;
 
-        let endianness = Endianness::from_byte(bytes[5])?;
+        let endianness = Endianness::parse_byte(bytes[5])?;
         let header_version = bytes[6];
         let os_abi = Abi::from_byte(bytes[7]);
         let abi_version = bytes[8];
 
-        // the offset given by the padding bytes which are the bytes 9-15
-        let offset = 16;
-        let file_type = FileType::from_bytes(&bytes[offset..offset +2], endianness)?;
-        let arch = Arch::from_bytes(&bytes[offset +2..offset +4], endianness)?;
-        let version = u32::from_bytes(&bytes[offset +4..offset +8], endianness);
+        let file_type = FileType::parse_bytes(&bytes[16..18], endianness)?;
+        let arch = Arch::parse_bytes(&bytes[18..20], endianness)?;
+        let version = u32::from_bytes(&bytes[20..24], endianness);
 
-        // now we have fields of varying size so we use a mutable offset to track the current position
-        // this way we keep the slicing short and simple
-        let mut byte_offset = offset + 8;
+        // these are the word width dependent offsets of the fields: 
+        // [entry_point, pheader_start, sheader_start, flags, header_size, pheader_entry_size, pheader_entries, sheader_entry_size, sheader_entries, section_names_index] 
+        let offsets = match word_width {
+            WordWidth::Width32 => [24, 28, 32, 36, 40, 42, 44, 46, 48, 50, 52],
+            WordWidth::Width64 => [24, 32, 40, 48, 52, 54, 56, 58, 60, 62, 64]
+        } ;
 
-        let (entry_point, read) = Word::from_bytes(&bytes[byte_offset..], word_width, endianness)?;
-        byte_offset += read;
+        let entry_point = Word::parse_bytes(&bytes[offsets[0]..], word_width, endianness)?;
+        let program_header_start = Word::parse_bytes(&bytes[offsets[1]..], word_width, endianness)?;
+        let section_header_start = Word::parse_bytes(&bytes[offsets[2]..], word_width, endianness)?;
 
-        let (program_header_start, read) = Word::from_bytes(&bytes[byte_offset..], word_width, endianness)?;
-        byte_offset += read;
-
-        let (section_header_start, read) = Word::from_bytes(&bytes[byte_offset..], word_width, endianness)?;
-        byte_offset += read;
-
-        let offset = byte_offset;
-        let flags = u32::from_bytes(&bytes[offset..offset+4], endianness);
-        let header_size = u16::from_bytes(&bytes[offset+4..offset+6], endianness);
+        let flags = u32::from_bytes(&bytes[offsets[3]..offsets[4]], endianness);
+        let header_size = u16::from_bytes(&bytes[offsets[4]..offsets[5]], endianness);
 
         if required_bytes != header_size as usize {
             return Err(ParseError::InvalidHeaderLength(header_size as usize));
         }
 
-        let pheader_entry_size = u16::from_bytes(&bytes[offset+6..offset+8], endianness);
-        let pheader_entries = u16::from_bytes(&bytes[offset+8..offset+10], endianness);
-        let sheader_entry_size = u16::from_bytes(&bytes[offset+10..offset+12], endianness);
-        let sheader_entries = u16::from_bytes(&bytes[offset+12..offset+14], endianness);
-        let section_names_index = u16::from_bytes(&bytes[offset+14..offset+16], endianness);
+        let pheader_entry_size = u16::from_bytes(&bytes[offsets[5]..offsets[6]], endianness);
+        let pheader_entries = u16::from_bytes(&bytes[offsets[6]..offsets[7]], endianness);
+        let sheader_entry_size = u16::from_bytes(&bytes[offsets[7]..offsets[8]], endianness);
+        let sheader_entries = u16::from_bytes(&bytes[offsets[8]..offsets[9]], endianness);
+        let section_names_index = u16::from_bytes(&bytes[offsets[9]..offsets[10]], endianness);
 
         Ok(
             Header {
@@ -567,44 +550,123 @@ impl Header {
         let magic_bytes = &magic[1..];
         (magic[0] == 0x7F) && magic_bytes.eq(&ELF_ASCII)
     }
+
+    pub const fn word_width(&self) -> WordWidth {
+        self.word_width
+    }
+
+    pub const fn endianness(&self) -> Endianness {
+        self.endianness
+    }
+
+    pub const fn header_version(&self) -> u8 {
+        self.header_version
+    }
+
+    pub const fn os_abi(&self) -> Abi {
+        self.os_abi
+    }
+
+    pub const fn abi_version(&self) -> u8 {
+        self.abi_version
+    }
+
+    pub const fn file_type(&self) -> FileType {
+        self.file_type
+    }
+
+    pub const fn arch(&self) -> Arch {
+        self.arch
+    }
+
+    pub const fn version(&self) -> u32 {
+        self.version
+    }
+
+    pub const fn entry_point(&self) -> Word {
+        self.entry_point
+    }
+
+    pub const fn program_header_start(&self) -> Word {
+        self.program_header_start
+    }
+
+    pub const fn section_header_start(&self) -> Word {
+        self.section_header_start
+    }
+
+    pub const fn flags(&self) -> u32 {
+        self.flags
+    }
+
+    pub const fn program_header_entry_size(&self) -> u16 {
+        self.pheader_entry_size
+    }
+
+    pub const fn program_header_entry_count(&self) -> u16 {
+        self.pheader_entries
+    }
+
+    pub const fn section_header_entry_size(&self) -> u16 {
+        self.sheader_entry_size
+    }
+
+    pub const fn section_header_entry_count(&self) -> u16 {
+        self.sheader_entries
+    }
+
+    pub const fn section_names_index(&self) -> u16 {
+        self.section_names_index
+    }
+
+    pub const fn size(&self) -> u64 {
+         match self.word_width {
+             WordWidth::Width32 => 52,
+             WordWidth::Width64 => 64
+         }
+    }
 }
 
 // ASCII for "ELF"
 static ELF_ASCII: [u8;3] = [0x45, 0x4C, 0x46];
 
+#[cfg(test)]
+impl ProgramHeader {
+    
+    pub(crate) const fn new(typ: ProgramHeaderSegmentType, offset: Word, vaddress: Word, paddress: Word,
+        filesize: Word, memsize: Word, flags: u32, alignment: Word) -> ProgramHeader {
+            ProgramHeader {
+                typ,
+                offset,
+                vaddress,
+                paddress,
+                filesize,
+                memsize,
+                flags,
+                alignment
+            }
+        }
+}
+
 impl ProgramHeader {
 
-    pub(crate) const fn new(typ: ProgramHeaderSegmentType, offset: Word, vaddress: Word, paddress: Word,
-    filesize: Word, memsize: Word, flags: u32, alignment: Word) -> ProgramHeader {
-        ProgramHeader {
-            typ,
-            offset,
-            vaddress,
-            paddress,
-            filesize,
-            memsize,
-            flags,
-            alignment
-        }
-    }
-
-    pub(crate) fn from_bytes(bytes: &[u8], word_width: WordWidth, endianness: Endianness) -> ELFResult<ProgramHeader> {
+    pub(crate) fn parse_bytes(bytes: &[u8], word_width: WordWidth, endianness: Endianness) -> ELFResult<ProgramHeader> {
         ProgramHeader::check_length(32, bytes.len())?;
-        let typ = ProgramHeaderSegmentType::from_bytes(bytes, endianness)?;
-        // offsets is an array of offsets in bytes for the fields of the program header
-        // the fields are [offset, vaddress, paddress, filesize, memsize, flags, alignment]
+        let typ = ProgramHeaderSegmentType::parse_bytes(bytes, endianness)?;
+        // these are the word width dependent offsets of the fields:
+        // [offset, vaddress, paddress, filesize, memsize, flags, alignment]
         let (offsets, size) = match word_width {
             WordWidth::Width32 => ([4, 8, 12, 16, 20, 24, 28], 32),
             WordWidth::Width64 => ([8, 16, 24, 32, 40, 4, 48], 54)
         };
         ProgramHeader::check_length(size, bytes.len())?;
-        let (offset, _) = Word::from_bytes(&bytes[offsets[0]..], word_width, endianness)?;
-        let (vaddress, _) = Word::from_bytes(&bytes[offsets[1]..], word_width, endianness)?;
-        let (paddress, _) = Word::from_bytes(&bytes[offsets[2]..], word_width, endianness)?;
-        let (filesize, _) = Word::from_bytes(&bytes[offsets[3]..], word_width, endianness)?;
-        let (memsize, _) = Word::from_bytes(&bytes[offsets[4]..], word_width, endianness)?;
+        let offset = Word::parse_bytes(&bytes[offsets[0]..], word_width, endianness)?;
+        let vaddress = Word::parse_bytes(&bytes[offsets[1]..], word_width, endianness)?;
+        let paddress = Word::parse_bytes(&bytes[offsets[2]..], word_width, endianness)?;
+        let filesize = Word::parse_bytes(&bytes[offsets[3]..], word_width, endianness)?;
+        let memsize = Word::parse_bytes(&bytes[offsets[4]..], word_width, endianness)?;
         let flags = u32::from_bytes(&bytes[offsets[5]..], endianness);
-        let (alignment, _) = Word::from_bytes(&bytes[offsets[6]..], word_width, endianness)?;
+        let alignment = Word::parse_bytes(&bytes[offsets[6]..], word_width, endianness)?;
         ProgramHeader::validate_vaddr(offset, vaddress, alignment)?;
         Ok(ProgramHeader {
             typ,
@@ -631,7 +693,7 @@ impl ProgramHeader {
             Word::Word64(u) => u,
             Word::Word32(u) => u as u64
         };
-        if align == 0 || align == 1 {
+        if align <= 1 {
             Ok(())
         } else if !align.is_power_of_two() {
             Err(ParseError::InvalidAlignment(align))
@@ -644,7 +706,7 @@ impl ProgramHeader {
                 Word::Word64(u) => u,
                 Word::Word32(u) => u as u64
             };
-            if normalized_addr == offset % align {
+            if normalized_addr == offset && normalized_addr % align == 0 {
                 Ok(())
             } else {
                 Err(ParseError::InvalidVirtualAddress(addr))
@@ -652,8 +714,6 @@ impl ProgramHeader {
         }
     }
 }
-
-
 //TODO maybe reimplement this facility with macros to ensure the correct number of bytes at compile time
 pub(crate) trait FromBytesEndianned {
     fn from_bytes(bytes: &[u8], endianness: Endianness) -> Self;
