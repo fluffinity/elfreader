@@ -657,7 +657,7 @@ impl ProgramHeader {
         // [offset, vaddress, paddress, filesize, memsize, flags, alignment]
         let (offsets, size) = match word_width {
             WordWidth::Width32 => ([4, 8, 12, 16, 20, 24, 28], 32),
-            WordWidth::Width64 => ([8, 16, 24, 32, 40, 4, 48], 54)
+            WordWidth::Width64 => ([8, 16, 24, 32, 40, 4, 48], 56)
         };
         ProgramHeader::check_length(size, bytes.len())?;
         let offset = Word::parse_bytes(&bytes[offsets[0]..], word_width, endianness)?;
@@ -706,9 +706,11 @@ impl ProgramHeader {
                 Word::Word64(u) => u,
                 Word::Word32(u) => u as u64
             };
-            if normalized_addr == offset && normalized_addr % align == 0 {
+            if normalized_addr % align == offset % align {
                 Ok(())
             } else {
+                println!("Welp, RIP");
+                println!("normalized_addr: {}, offset: {}, align: {}", normalized_addr, offset, align);
                 Err(ParseError::InvalidVirtualAddress(addr))
             }
         }
