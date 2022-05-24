@@ -1,5 +1,6 @@
 # elfreader
-A simple tool for reading ELF headers written in Rust
+A simple tool for reading ELF headers written in Rust. This is my way to learn the ELF file format.
+Inspired by the GNU binutil `readelf`
 
 # The tool is feature incomplete in the moment
 
