@@ -1,12 +1,8 @@
+mod elf;
+use crate::elf::{Header, Word, ProgramHeader};
+
 use std::fs::File;
 use std::io::{Read, Seek, SeekFrom};
-
-mod elf;
-mod test_elf_structs_from_bytes;
-mod test_from_bytes_endianned;
-use elf::Header;
-
-use crate::elf::{Word, ProgramHeader};
 
 fn main() -> Result<(), i32> {
     println!("Hello, world!");
@@ -43,7 +39,7 @@ fn main() -> Result<(), i32> {
     };
     println!("header parsed successfully");
     //TODO implement pretty printing and selective printing of informations
-    println!("the content is: {:?}", header);
+    println!("the content is: {:#x?}", header);
     let pheader_offset: u64 = match header.program_header_start() {
         Word::Word32(i) => i as u64,
         Word::Word64(i) => i
@@ -76,7 +72,7 @@ fn main() -> Result<(), i32> {
     let program_headers: Vec<_> = program_headers.into_iter().map(|entry| entry.expect("checked for Err")).collect();
     println!("program headers:");
     program_headers.iter().for_each(|pheader| {
-        println!("{:?}", pheader);
+        println!("{:#x?}", pheader);
     });
     Ok(())
 }
