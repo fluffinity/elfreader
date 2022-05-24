@@ -1,7 +1,57 @@
+use super::Endianness;
+
+pub trait FromBytesEndianned {
+    fn from_bytes(bytes: &[u8], endianness: Endianness) -> Self;
+}
+
+impl FromBytesEndianned for u16 {
+    fn from_bytes(bytes: &[u8], endianness: Endianness) -> Self {
+        assert!(bytes.len() >= 2);
+        let bytes = get_u16_bytes(bytes);
+        match endianness{
+            Endianness::Little => u16::from_le_bytes(bytes),
+            Endianness::Big => u16::from_be_bytes(bytes)
+        }
+    }
+}
+
+impl FromBytesEndianned for u32 {
+    fn from_bytes(bytes: &[u8], endianness: Endianness) -> Self {
+        assert!(bytes.len() >= 4);
+        let bytes = get_u32_bytes(bytes);
+        match endianness{
+            Endianness::Little => u32::from_le_bytes(bytes),
+            Endianness::Big => u32::from_be_bytes(bytes)
+        }
+    }
+}
+
+impl FromBytesEndianned for u64 {
+    fn from_bytes(bytes: &[u8], endianness: Endianness) -> Self {
+        assert!(bytes.len() >= 8);
+        let bytes = get_u64_bytes(bytes);
+        match endianness {
+            Endianness::Little => u64::from_le_bytes(bytes),
+            Endianness::Big => u64::from_be_bytes(bytes)
+        }
+    }
+}
+
+pub(super) fn get_u16_bytes(bytes: &[u8]) -> [u8;2] {
+    [bytes[0], bytes[1]]
+}
+
+pub(super) fn get_u32_bytes(bytes: &[u8]) -> [u8;4] {
+    [bytes[0], bytes[1], bytes[2], bytes[3]]
+}
+
+pub(super) fn get_u64_bytes(bytes: &[u8]) -> [u8;8] {
+    [bytes[0], bytes[1], bytes[2], bytes[3], bytes[4], bytes[5], bytes[6], bytes[7]]
+}
+
 #[cfg(test)]
 mod test {
-
-    use crate::elf::*;
+    use super::{Endianness, FromBytesEndianned};
 
     #[test]
     fn test_from_bytes_u16_little_zero() {
