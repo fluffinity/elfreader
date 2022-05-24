@@ -38,7 +38,7 @@ fn main() -> Result<(), i32> {
     };
     println!("Header parsed successfully");
     //TODO implement pretty printing and selective printing of informations
-    println!("The content is: {:?}", header);
+    println!("The content is: {:#x?}", header);
 
     let pheader_offset: u64 = match header.program_header_start() {
         Word::Word32(i) => i as u64,
