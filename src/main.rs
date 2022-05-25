@@ -23,7 +23,7 @@ fn main() -> Result<(), i32> {
         Ok(metadata) => metadata,
         Err(error) => {
             eprintln!("Error parsing the ELF metadata:");
-            eprintln!("{:?}", error);
+            eprintln!("{:#x?}", error);
             return Err(1);
         }
     };
