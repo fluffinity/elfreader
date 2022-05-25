@@ -153,26 +153,26 @@ impl Header {
         // these are the word width dependent offsets of the fields:
         // [entry_point, pheader_start, sheader_start, flags, header_size, pheader_entry_size, pheader_entries, sheader_entry_size, sheader_entries, section_names_index]
         let offsets = match word_width {
-            WordWidth::Width32 => [24, 28, 32, 36, 40, 42, 44, 46, 48, 50, 52],
-            WordWidth::Width64 => [24, 32, 40, 48, 52, 54, 56, 58, 60, 62, 64],
+            WordWidth::Width32 => [24, 28, 32, 36, 40, 42, 44, 46, 48, 50],
+            WordWidth::Width64 => [24, 32, 40, 48, 52, 54, 56, 58, 60, 62],
         };
 
         let entry_point = Word::parse_bytes(&bytes[offsets[0]..], word_width, endianness)?;
         let program_header_start = Word::parse_bytes(&bytes[offsets[1]..], word_width, endianness)?;
         let section_header_start = Word::parse_bytes(&bytes[offsets[2]..], word_width, endianness)?;
 
-        let flags = u32::from_bytes(&bytes[offsets[3]..offsets[4]], endianness);
-        let header_size = u16::from_bytes(&bytes[offsets[4]..offsets[5]], endianness);
+        let flags = u32::from_bytes(&bytes[offsets[3]..], endianness);
+        let header_size = u16::from_bytes(&bytes[offsets[4]..], endianness);
 
         if required_bytes != header_size as usize {
             return Err(ParseError::InvalidHeaderLength(header_size as usize));
         }
 
-        let pheader_entry_size = u16::from_bytes(&bytes[offsets[5]..offsets[6]], endianness);
-        let pheader_entries = u16::from_bytes(&bytes[offsets[6]..offsets[7]], endianness);
-        let sheader_entry_size = u16::from_bytes(&bytes[offsets[7]..offsets[8]], endianness);
-        let sheader_entries = u16::from_bytes(&bytes[offsets[8]..offsets[9]], endianness);
-        let section_names_index = u16::from_bytes(&bytes[offsets[9]..offsets[10]], endianness);
+        let pheader_entry_size = u16::from_bytes(&bytes[offsets[5]..], endianness);
+        let pheader_entries = u16::from_bytes(&bytes[offsets[6]..], endianness);
+        let sheader_entry_size = u16::from_bytes(&bytes[offsets[7]..], endianness);
+        let sheader_entries = u16::from_bytes(&bytes[offsets[8]..], endianness);
+        let section_names_index = u16::from_bytes(&bytes[offsets[9]..], endianness);
 
         Ok(Header {
             word_width,
