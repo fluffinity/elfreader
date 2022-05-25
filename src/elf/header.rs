@@ -18,16 +18,15 @@ pub struct Header {
     pheader_entries: u16,
     sheader_entry_size: u16,
     sheader_entries: u16,
-    section_names_index: u16
+    section_names_index: u16,
 }
 
 #[cfg(test)]
 impl Header {
-
     pub(crate) const fn minimal(word_width: WordWidth, endianness: Endianness) -> Self {
         let word = match word_width {
             WordWidth::Width32 => Word::Word32(0),
-            _ => Word::Word64(0)
+            _ => Word::Word64(0),
         };
         Header {
             word_width,
@@ -46,7 +45,7 @@ impl Header {
             pheader_entries: 0,
             sheader_entry_size: 0,
             sheader_entries: 0,
-            section_names_index: 0
+            section_names_index: 0,
         }
     }
 
@@ -127,8 +126,7 @@ impl Header {
 }
 
 impl Header {
-
-    pub fn parse_bytes(bytes: &[u8]) -> ELFResult<Header> {
+    pub fn parse_bytes(bytes: &[u8]) -> Result<Header> {
         // we need at least 52 bytes to parse an ELF header. This is the case for 32-bit ELF files
         Header::check_length(52, bytes.len())?;
 
@@ -152,12 +150,12 @@ impl Header {
         let arch = Arch::parse_bytes(&bytes[18..20], endianness)?;
         let version = u32::from_bytes(&bytes[20..24], endianness);
 
-        // these are the word width dependent offsets of the fields: 
-        // [entry_point, pheader_start, sheader_start, flags, header_size, pheader_entry_size, pheader_entries, sheader_entry_size, sheader_entries, section_names_index] 
+        // these are the word width dependent offsets of the fields:
+        // [entry_point, pheader_start, sheader_start, flags, header_size, pheader_entry_size, pheader_entries, sheader_entry_size, sheader_entries, section_names_index]
         let offsets = match word_width {
             WordWidth::Width32 => [24, 28, 32, 36, 40, 42, 44, 46, 48, 50, 52],
-            WordWidth::Width64 => [24, 32, 40, 48, 52, 54, 56, 58, 60, 62, 64]
-        } ;
+            WordWidth::Width64 => [24, 32, 40, 48, 52, 54, 56, 58, 60, 62, 64],
+        };
 
         let entry_point = Word::parse_bytes(&bytes[offsets[0]..], word_width, endianness)?;
         let program_header_start = Word::parse_bytes(&bytes[offsets[1]..], word_width, endianness)?;
@@ -176,30 +174,28 @@ impl Header {
         let sheader_entries = u16::from_bytes(&bytes[offsets[8]..offsets[9]], endianness);
         let section_names_index = u16::from_bytes(&bytes[offsets[9]..offsets[10]], endianness);
 
-        Ok(
-            Header {
-                word_width,
-                endianness,
-                header_version,
-                os_abi,
-                abi_version,
-                file_type,
-                arch,
-                version,
-                entry_point,
-                program_header_start,
-                section_header_start,
-                flags,
-                pheader_entry_size,
-                pheader_entries,
-                sheader_entry_size,
-                sheader_entries,
-                section_names_index
-            }
-        )
+        Ok(Header {
+            word_width,
+            endianness,
+            header_version,
+            os_abi,
+            abi_version,
+            file_type,
+            arch,
+            version,
+            entry_point,
+            program_header_start,
+            section_header_start,
+            flags,
+            pheader_entry_size,
+            pheader_entries,
+            sheader_entry_size,
+            sheader_entries,
+            section_names_index,
+        })
     }
 
-    fn check_length(minimum: usize, actual: usize) -> ELFResult<()> {
+    fn check_length(minimum: usize, actual: usize) -> Result<()> {
         if actual < minimum {
             Err(ParseError::InvalidHeaderLength(actual))
         } else {
@@ -207,7 +203,7 @@ impl Header {
         }
     }
 
-    fn check_magic(bytes: &[u8]) -> ELFResult<()> {
+    fn check_magic(bytes: &[u8]) -> Result<()> {
         static MAGIC: u32 = u32::from_le_bytes([0x7F, 0x45, 0x4C, 0x46]);
         let value = u32::from_bytes(bytes, Endianness::Little);
         if value != MAGIC {
@@ -286,10 +282,10 @@ impl Header {
     }
 
     pub const fn size(&self) -> u64 {
-         match self.word_width {
-             WordWidth::Width32 => 52,
-             WordWidth::Width64 => 64
-         }
+        match self.word_width {
+            WordWidth::Width32 => 52,
+            WordWidth::Width64 => 64,
+        }
     }
 }
 
@@ -298,100 +294,72 @@ mod test {
     use super::*;
     #[test]
     fn test_valid_magic() {
-        let test_data  = [
+        let test_data = [
             ([0x7F, 0x45, 0x4C, 0x46], true),
             ([0x7E, 0x45, 0x4C, 0x46], false),
-            ([0x7F, 0x46, 0x4C, 0x46], false)
+            ([0x7F, 0x46, 0x4C, 0x46], false),
         ];
         for (bytes, expected) in test_data.iter() {
             assert_eq!(Header::check_magic(bytes).is_ok(), *expected);
         }
     }
 
-    static VALID_HEADER_DATA_32: [u8;52] = [
+    static VALID_HEADER_DATA_32: [u8; 52] = [
         // magic
-        0x7F, 0x45, 0x4C, 0x46,
-        // word width
+        0x7F, 0x45, 0x4C, 0x46, // word width
         0x01, // 32-bit
         // endianness
         0x01, // little
         // header version
-        0x01,
-        // OS ABI
+        0x01, // OS ABI
         0x03, // Linux
         // ABI version
-        0x01,
-        // padding
-        0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-        // file type
+        0x01, // padding
+        0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, // file type
         0x02, 0x00, // executable
         // arch
         0x3E, 0x00, // x86_64
         // version
-        0x01, 0xFF, 0x00, 0x00,
-        // entry point
-        0x00, 0x00, 0x00, 0xF0,
-        // program header start
-        0x34, 0x00, 0x00, 0x00,
-        // section header start
-        0x00, 0x00, 0x30, 0x00,
-        // flags
-        0x4F, 0xF1, 0x97, 0xC4,
-        // header size
-        0x34, 0x00,
-        // program header entry size
-        0x20, 0x00,
-        // program header entry count
-        0x01, 0x00,
-        // section header entry size
-        0x10, 0x00,
-        // section header entry count
-        0x00, 0x01,
-        // section names index
-        0x30, 0x00
+        0x01, 0xFF, 0x00, 0x00, // entry point
+        0x00, 0x00, 0x00, 0xF0, // program header start
+        0x34, 0x00, 0x00, 0x00, // section header start
+        0x00, 0x00, 0x30, 0x00, // flags
+        0x4F, 0xF1, 0x97, 0xC4, // header size
+        0x34, 0x00, // program header entry size
+        0x20, 0x00, // program header entry count
+        0x01, 0x00, // section header entry size
+        0x10, 0x00, // section header entry count
+        0x00, 0x01, // section names index
+        0x30, 0x00,
     ];
 
-    static VALID_HEADER_DATA_64: [u8;64] = [
+    static VALID_HEADER_DATA_64: [u8; 64] = [
         // magic
-        0x7F, 0x45, 0x4C, 0x46,
-        // word width
+        0x7F, 0x45, 0x4C, 0x46, // word width
         0x02, // 64-bit
         // endianness
         0x01, // little
         // header version
-        0x01,
-        // OS ABI
+        0x01, // OS ABI
         0x03, // Linux
         // ABI version
-        0x01,
-        // padding
-        0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-        // file type
+        0x01, // padding
+        0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, // file type
         0x02, 0x00, // executable
         // arch
         0x3E, 0x00, // x86_64
         // version
-        0x01, 0xFF, 0x00, 0x00,
-        // entry point
-        0x00, 0x00, 0x00, 0x00, 0x80, 0x00, 0x00, 0x00,
-        // program header start
-        0x40, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-        // section header start
-        0x00, 0x00, 0x00, 0x80, 0x00, 0x00, 0x00, 0x00,
-        // flags
-        0xFF, 0x3A, 0x10, 0x57,
-        // header size
-        0x40, 0x00,
-        // program header entry size
-        0x38, 0x00,
-        // program header entry count
-        0x01, 0x00,
-        // section header entry size
-        0x00, 0x80,
-        // section header entry count
-        0x40, 0x00,
-        // section names index
-        0x2F, 0x00
+        0x01, 0xFF, 0x00, 0x00, // entry point
+        0x00, 0x00, 0x00, 0x00, 0x80, 0x00, 0x00, 0x00, // program header start
+        0x40, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, // section header start
+        0x00, 0x00, 0x00, 0x80, 0x00, 0x00, 0x00, 0x00, // flags
+        0xFF, 0x3A, 0x10, 0x57, // header size
+        0x40, 0x00, // program header entry size
+        0x38, 0x00, // program header entry count
+        0x01, 0x00, // section header entry size
+        0x00, 0x80, // section header entry count
+        0x40, 0x00, // section names index
+        0x2F, 0x00,
     ];
 
     static VALID_HEADER_32: Header = Header::minimal(WordWidth::Width32, Endianness::Little)

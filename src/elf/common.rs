@@ -1,6 +1,6 @@
 use super::FromBytesEndianned;
 
-use std::fmt::{LowerHex, Formatter, UpperHex, Binary, Debug};
+use std::fmt::{Binary, Debug, Formatter, LowerHex, UpperHex};
 
 #[derive(Debug, Eq, PartialEq, Copy, Clone)]
 pub enum FileType {
@@ -9,19 +9,19 @@ pub enum FileType {
     Executable,
     Shared,
     Core,
-    Specific(u16)
+    Specific(u16),
 }
 
 #[derive(Debug, Eq, PartialEq, Copy, Clone)]
 pub enum WordWidth {
     Width32,
-    Width64
+    Width64,
 }
 
 #[derive(Debug, Eq, PartialEq, Copy, Clone)]
 pub enum Endianness {
     Little,
-    Big
+    Big,
 }
 
 #[derive(Debug, Eq, PartialEq, Copy, Clone)]
@@ -44,7 +44,7 @@ pub enum Abi {
     FenixOS,
     CloudABI,
     OpenVOS,
-    Unknown
+    Unknown,
 }
 
 #[derive(Debug, Eq, PartialEq, Copy, Clone)]
@@ -74,13 +74,13 @@ pub enum Arch {
     RISCV,
     BPF,
     WDC65C816,
-    Unknown
+    Unknown,
 }
 
 #[derive(Eq, PartialEq, Copy, Clone, Ord, PartialOrd)]
 pub enum Word {
     Word32(u32),
-    Word64(u64)
+    Word64(u64),
 }
 
 #[derive(Debug, Eq, PartialEq, Copy, Clone)]
@@ -94,14 +94,13 @@ pub enum ParseError {
     InvalidProgHeaderType(u32),
     InvalidAlignment(u64),
     InvalidVirtualAddress(Word),
-    InsufficientPartLength(usize)
+    InsufficientPartLength(usize),
 }
 
-pub type ELFResult<T> = Result<T, ParseError>;
+pub type Result<T> = std::result::Result<T, ParseError>;
 
 impl FileType {
-
-    fn parse_u16(i: u16) -> ELFResult<FileType> {
+    fn parse_u16(i: u16) -> Result<FileType> {
         use FileType::*;
         match i {
             0x0000 => Ok(None),
@@ -110,11 +109,11 @@ impl FileType {
             0x0003 => Ok(Shared),
             0x0004 => Ok(Core),
             _ if i >= 0xff00 => Ok(Specific(i)),
-            _ => Err(ParseError::InvalidFileType(i))
+            _ => Err(ParseError::InvalidFileType(i)),
         }
     }
 
-    pub(crate) fn parse_bytes(bytes: &[u8], endianness: Endianness) -> ELFResult<FileType> {
+    pub(crate) fn parse_bytes(bytes: &[u8], endianness: Endianness) -> Result<FileType> {
         if bytes.len() < 2 {
             Err(ParseError::InsufficientPartLength(bytes.len()))
         } else {
@@ -124,31 +123,28 @@ impl FileType {
 }
 
 impl WordWidth {
-
-    pub(crate) fn parse_byte(b: u8) -> ELFResult<WordWidth> {
+    pub(crate) fn parse_byte(b: u8) -> Result<WordWidth> {
         use WordWidth::*;
         match b {
             0x01 => Ok(Width32),
             0x02 => Ok(Width64),
-            _ => Err(ParseError::InvalidWordWidth(b))
+            _ => Err(ParseError::InvalidWordWidth(b)),
         }
     }
 }
 
 impl Endianness {
-
-    pub(crate) fn parse_byte(b: u8) -> ELFResult<Endianness> {
+    pub(crate) fn parse_byte(b: u8) -> Result<Endianness> {
         use Endianness::*;
         match b {
             0x01 => Ok(Little),
             0x02 => Ok(Big),
-            _ => Err(ParseError::InvalidEndianness(b))
+            _ => Err(ParseError::InvalidEndianness(b)),
         }
     }
 }
 
 impl Abi {
-
     pub(crate) fn from_byte(b: u8) -> Abi {
         use Abi::*;
         match b {
@@ -170,13 +166,12 @@ impl Abi {
             0x10 => FenixOS,
             0x11 => CloudABI,
             0x12 => OpenVOS,
-            _ => Unknown
+            _ => Unknown,
         }
     }
 }
 
 impl Arch {
-
     fn from_u16(i: u16) -> Arch {
         use Arch::*;
         match i {
@@ -205,11 +200,11 @@ impl Arch {
             0x00F3 => RISCV,
             0x00F7 => BPF,
             0x0101 => WDC65C816,
-            _ => Unknown
+            _ => Unknown,
         }
     }
 
-    pub(crate) fn parse_bytes(bytes: &[u8], endianness: Endianness) -> ELFResult<Arch> {
+    pub(crate) fn parse_bytes(bytes: &[u8], endianness: Endianness) -> Result<Arch> {
         // allow larger slices as well. The number of read bytes is known statically
         if bytes.len() < 2 {
             Err(ParseError::InsufficientPartLength(bytes.len()))
@@ -220,8 +215,11 @@ impl Arch {
 }
 
 impl Word {
-
-    pub(crate) fn parse_bytes(bytes: &[u8], word_width: WordWidth, endianness: Endianness) -> ELFResult<Word> {
+    pub(crate) fn parse_bytes(
+        bytes: &[u8],
+        word_width: WordWidth,
+        endianness: Endianness,
+    ) -> Result<Word> {
         match word_width {
             WordWidth::Width32 => {
                 if bytes.len() < 4 {
@@ -229,7 +227,7 @@ impl Word {
                 } else {
                     Ok(Word::Word32(u32::from_bytes(bytes, endianness)))
                 }
-            },
+            }
             WordWidth::Width64 => {
                 if bytes.len() < 8 {
                     Err(ParseError::InsufficientPartLength(bytes.len()))
@@ -241,11 +239,20 @@ impl Word {
     }
 }
 
+impl From<Word> for u64 {
+    fn from(word: Word) -> Self {
+        match word {
+            Word::Word32(i) => i as u64,
+            Word::Word64(i) => i,
+        }
+    }
+}
+
 impl Debug for Word {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         match *self {
             Word::Word32(u) => write!(f, "Word32({:#x})", u),
-            Word::Word64(u) => write!(f, "Word64({:#x})", u)
+            Word::Word64(u) => write!(f, "Word64({:#x})", u),
         }
     }
 }
@@ -254,7 +261,7 @@ impl LowerHex for Word {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         match *self {
             Word::Word32(u) => LowerHex::fmt(&u, f),
-            Word::Word64(u) => LowerHex::fmt(&u, f)
+            Word::Word64(u) => LowerHex::fmt(&u, f),
         }
     }
 }
@@ -263,7 +270,7 @@ impl UpperHex for Word {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         match *self {
             Word::Word32(u) => UpperHex::fmt(&u, f),
-            Word::Word64(u) => UpperHex::fmt(&u, f)
+            Word::Word64(u) => UpperHex::fmt(&u, f),
         }
     }
 }
@@ -272,7 +279,7 @@ impl Binary for Word {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         match *self {
             Word::Word32(u) => Binary::fmt(&u, f),
-            Word::Word64(u) => Binary::fmt(&u, f)
+            Word::Word64(u) => Binary::fmt(&u, f),
         }
     }
 }
@@ -295,7 +302,7 @@ mod test {
             ([0x04, 0x00], Endianness::Little, FileType::Core),
             ([0x00, 0x04], Endianness::Big, FileType::Core),
             ([0x9D, 0xFF], Endianness::Little, FileType::Specific(0xFF9D)),
-            ([0xFF, 0x9D], Endianness::Big, FileType::Specific(0xFF9D))
+            ([0xFF, 0x9D], Endianness::Big, FileType::Specific(0xFF9D)),
         ];
         for (data, endianness, expected) in test_data.iter() {
             assert_eq!(FileType::parse_bytes(data, *endianness), Ok(*expected));
@@ -305,9 +312,21 @@ mod test {
     #[test]
     fn test_file_type_err() {
         let test_data = [
-            ([0xE3, 0xE3], Endianness::Little, ParseError::InvalidFileType(0xE3E3)),
-            ([0xFF, 0xFE], Endianness::Little, ParseError::InvalidFileType(0xFEFF)),
-            ([0xFE, 0xFF], Endianness::Big, ParseError::InvalidFileType(0xFEFF))
+            (
+                [0xE3, 0xE3],
+                Endianness::Little,
+                ParseError::InvalidFileType(0xE3E3),
+            ),
+            (
+                [0xFF, 0xFE],
+                Endianness::Little,
+                ParseError::InvalidFileType(0xFEFF),
+            ),
+            (
+                [0xFE, 0xFF],
+                Endianness::Big,
+                ParseError::InvalidFileType(0xFEFF),
+            ),
         ];
         for (data, endianness, expected) in test_data.iter() {
             assert_eq!(FileType::parse_bytes(data, *endianness), Err(*expected));
@@ -316,10 +335,7 @@ mod test {
 
     #[test]
     fn test_word_width_ok() {
-        let test_data = [
-            (0x01, WordWidth::Width32),
-            (0x02, WordWidth::Width64)
-        ];
+        let test_data = [(0x01, WordWidth::Width32), (0x02, WordWidth::Width64)];
         for (byte, expected) in test_data.iter() {
             assert_eq!(WordWidth::parse_byte(*byte), Ok(*expected));
         }
@@ -329,16 +345,16 @@ mod test {
     fn test_word_width_err() {
         let test_data = [0x00, 0x03, 0xFF, 0x3D];
         for &byte in test_data.iter() {
-            assert_eq!(WordWidth::parse_byte(byte), Err(ParseError::InvalidWordWidth(byte)));
+            assert_eq!(
+                WordWidth::parse_byte(byte),
+                Err(ParseError::InvalidWordWidth(byte))
+            );
         }
     }
 
     #[test]
     fn test_endianness_ok() {
-        let test_data = [
-            (0x01, Endianness::Little),
-            (0x02, Endianness::Big)
-        ];
+        let test_data = [(0x01, Endianness::Little), (0x02, Endianness::Big)];
         for (byte, expected) in test_data.iter() {
             assert_eq!(Endianness::parse_byte(*byte), Ok(*expected));
         }
@@ -348,7 +364,10 @@ mod test {
     fn test_endianness_err() {
         let test_data = [0x00, 0x03, 0xFF, 0x3D];
         for &byte in test_data.iter() {
-            assert_eq!(Endianness::parse_byte(byte), Err(ParseError::InvalidEndianness(byte)));
+            assert_eq!(
+                Endianness::parse_byte(byte),
+                Err(ParseError::InvalidEndianness(byte))
+            );
         }
     }
 
@@ -375,7 +394,7 @@ mod test {
             FenixOS,
             CloudABI,
             OpenVOS,
-            Unknown
+            Unknown,
         ];
         for (i, expected) in test_data.iter().enumerate() {
             assert_eq!(Abi::from_byte(i as u8), *expected);
@@ -412,7 +431,7 @@ mod test {
             (0x00F7, BPF),
             (0x0101, WDC65C816),
             (0x0102, Unknown),
-            (0xFFFF, Unknown)
+            (0xFFFF, Unknown),
         ];
         for (code, expected) in test_data.iter() {
             let bytes = code.to_le_bytes();
@@ -423,27 +442,53 @@ mod test {
     #[test]
     fn test_arch_err() {
         let test_data = [0x01_u8];
-        assert_eq!(Arch::parse_bytes(&test_data, Endianness::Little), Err(ParseError::InsufficientPartLength(1)));
-        assert_eq!(Arch::parse_bytes(&test_data, Endianness::Big), Err(ParseError::InsufficientPartLength(1)));
+        assert_eq!(
+            Arch::parse_bytes(&test_data, Endianness::Little),
+            Err(ParseError::InsufficientPartLength(1))
+        );
+        assert_eq!(
+            Arch::parse_bytes(&test_data, Endianness::Big),
+            Err(ParseError::InsufficientPartLength(1))
+        );
     }
 
     #[test]
     fn test_word_ok() {
         use Endianness::*;
-        use WordWidth::*;
         use Word::*;
+        use WordWidth::*;
         let test_data = [
-            ([0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00], Width64, Little, Word64(0)),
-            ([0x10, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00], Width32, Little, Word32(0x00000010)),
-            ([0xFF, 0x3E, 0x00, 0x00, 0x10, 0x20, 0x00, 0x00], Width64, Big, Word64(0xFF3E000010200000)),
-            ([0xFF, 0x3E, 0x00, 0x00, 0x10, 0x20, 0x00, 0x00], Width32, Big, Word32(0xFF3E0000))
+            (
+                [0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00],
+                Width64,
+                Little,
+                Word64(0),
+            ),
+            (
+                [0x10, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00],
+                Width32,
+                Little,
+                Word32(0x00000010),
+            ),
+            (
+                [0xFF, 0x3E, 0x00, 0x00, 0x10, 0x20, 0x00, 0x00],
+                Width64,
+                Big,
+                Word64(0xFF3E000010200000),
+            ),
+            (
+                [0xFF, 0x3E, 0x00, 0x00, 0x10, 0x20, 0x00, 0x00],
+                Width32,
+                Big,
+                Word32(0xFF3E0000),
+            ),
         ];
 
         for (bytes, width, endianness, expected) in test_data.iter() {
             let result = Word::parse_bytes(bytes, *width, *endianness);
             assert!(result.is_ok());
             let result = result.expect("checked is_ok()");
-            assert_eq!(result , *expected);
+            assert_eq!(result, *expected);
         }
     }
 }
