@@ -40,7 +40,7 @@ impl ProgramHeaderSegmentType {
             0x00000007 => Ok(ThreadLocalStorage),
             i if 0x60000000 <= i && i <= 0x6FFFFFFF => Ok(OSSpecific(i)),
             i if 0x70000000 <= i && i <= 0x7FFFFFFF => Ok(ProcessorSpecific(i)),
-            _ => Err(ParseError::InvalidProgHeaderType(u)),
+            _ => Err(ParseError::InvalidProgramHeaderType(u)),
         }
     }
 
@@ -118,7 +118,7 @@ impl ProgramHeader {
 
     fn check_length(expected: usize, actual: usize) -> Result<()> {
         if actual < expected {
-            Err(ParseError::InvalidProgHeaderLength(actual))
+            Err(ParseError::InsufficientProgramHeaderLength(actual))
         } else {
             Ok(())
         }
@@ -189,12 +189,12 @@ mod test {
 
     #[test]
     fn test_pheader_segment_type_err() {
-        use ParseError::InvalidProgHeaderType;
+        use ParseError::InvalidProgramHeaderType;
         let test_data = [0x00000008, 0x80000000];
         for num in test_data.iter() {
             let bytes = u32::to_le_bytes(*num);
             let result = ProgramHeaderSegmentType::parse_bytes(&bytes, Endianness::Little);
-            assert_eq!(result, Err(InvalidProgHeaderType(*num)));
+            assert_eq!(result, Err(InvalidProgramHeaderType(*num)));
         }
     }
 
@@ -265,7 +265,10 @@ mod test {
         let mut test_data = VALID_PHEADER_DATA_32_LITTLE.clone();
         test_data[0] = 0x08;
         let result = ProgramHeader::parse_bytes(&test_data, WordWidth::Width32, Endianness::Little);
-        assert_eq!(result, Err(ParseError::InvalidProgHeaderType(0x00000008)));
+        assert_eq!(
+            result,
+            Err(ParseError::InvalidProgramHeaderType(0x00000008))
+        );
     }
 
     #[test]

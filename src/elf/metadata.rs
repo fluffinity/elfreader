@@ -1,11 +1,12 @@
 use std::fs::File;
 use std::io::{Read, Seek, SeekFrom};
 
-use super::{Header, ParseError, ProgramHeader};
+use super::{Header, ParseError, ProgramHeader, SectionHeader, UnnamedSectionHeader};
 
 pub struct Metadata {
     header: Header,
     program_headers: Vec<ProgramHeader>,
+    section_headers: Vec<SectionHeader>,
 }
 
 #[derive(Debug)]
@@ -15,10 +16,15 @@ pub enum MetadataParseError {
 }
 
 impl Metadata {
-    pub fn new(header: Header, program_headers: Vec<ProgramHeader>) -> Metadata {
+    pub fn new(
+        header: Header,
+        program_headers: Vec<ProgramHeader>,
+        section_headers: Vec<SectionHeader>,
+    ) -> Metadata {
         Metadata {
             header,
             program_headers,
+            section_headers,
         }
     }
 
@@ -28,6 +34,10 @@ impl Metadata {
 
     pub fn program_headers(&self) -> &[ProgramHeader] {
         self.program_headers.as_slice()
+    }
+
+    pub fn section_headers(&self) -> &[SectionHeader] {
+        self.section_headers.as_slice()
     }
 
     pub fn parse_file(file: &mut File) -> std::result::Result<Metadata, MetadataParseError> {
@@ -41,6 +51,7 @@ impl Metadata {
             Err(err) => return Err(InvalidELF(err)),
             Ok(header) => header,
         };
+
         let pheader_offset = u64::from(header.program_header_start());
         let pheader_total_size =
             (header.program_header_entry_count() * header.program_header_entry_size()) as usize;
@@ -52,7 +63,35 @@ impl Metadata {
             return Err(IOError(err));
         }
         let program_headers = Metadata::parse_program_headers(&header, buf.as_slice())?;
-        Ok(Metadata::new(header, program_headers))
+
+        let sheader_offset = u64::from(header.section_header_start());
+        let sheader_total_size =
+            (header.section_header_entry_count() * header.section_header_entry_size()) as usize;
+        let mut buf: Vec<_> = std::iter::repeat(0).take(sheader_total_size).collect();
+        if let Err(err) = file.seek(SeekFrom::Start(sheader_offset)) {
+            return Err(IOError(err));
+        }
+        if let Err(err) = file.read_exact(buf.as_mut_slice()) {
+            return Err(IOError(err));
+        }
+        let section_headers = Metadata::parse_section_headers(&header, buf.as_slice())?;
+        let (name_table_offset, name_table_length) = match section_headers.last() {
+            None => return Ok(Metadata::new(header, program_headers, Vec::new())),
+            Some(sheader) => (u64::from(sheader.offset), u64::from(sheader.size) as usize),
+        };
+        if let Err(err) = file.seek(SeekFrom::Start(name_table_offset)) {
+            return Err(IOError(err));
+        }
+        let mut buf: Vec<_> = std::iter::repeat(0).take(name_table_length).collect();
+        if let Err(err) = file.read_exact(buf.as_mut_slice()) {
+            return Err(IOError(err));
+        }
+        let section_headers: Result<Vec<_>, ParseError> = section_headers
+            .into_iter()
+            .map(|header| header.to_named(buf.as_slice()))
+            .collect();
+        let section_headers = section_headers.map_err(|err| MetadataParseError::InvalidELF(err))?;
+        Ok(Metadata::new(header, program_headers, section_headers))
     }
 
     fn parse_program_headers(
@@ -70,6 +109,30 @@ impl Metadata {
                 match ProgramHeader::parse_bytes(&raw_pheaders[offset..], word_width, endianness) {
                     Err(err) => Err(InvalidELF(err)),
                     Ok(pheader) => Ok(pheader),
+                }
+            })
+            .collect()
+    }
+
+    fn parse_section_headers(
+        header: &Header,
+        raw_sheaders: &[u8],
+    ) -> Result<Vec<UnnamedSectionHeader>, MetadataParseError> {
+        use MetadataParseError::*;
+
+        let word_width = header.word_width();
+        let endianness = header.endianness();
+        (0..header.section_header_entry_count())
+            .into_iter()
+            .map(|i| {
+                let offset = (i * header.section_header_entry_size()) as usize;
+                match UnnamedSectionHeader::parse_bytes(
+                    &raw_sheaders[offset..],
+                    word_width,
+                    endianness,
+                ) {
+                    Err(err) => Err(InvalidELF(err)),
+                    Ok(sheader) => Ok(sheader),
                 }
             })
             .collect()

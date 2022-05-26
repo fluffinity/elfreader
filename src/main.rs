@@ -32,7 +32,11 @@ fn main() -> Result<(), i32> {
     println!("{:#x?}", metadata.header());
     println!("Content of the program headers:");
     metadata.program_headers().iter().for_each(|header| {
-        println!("{:#x?}", header);
+        println!("{:#018x?}", header);
+    });
+    println!("Content of the section headers:");
+    metadata.section_headers().iter().for_each(|header| {
+        println!("{:#018x?}", header);
     });
     Ok(())
 }

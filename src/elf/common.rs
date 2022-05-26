@@ -1,6 +1,9 @@
 use super::FromBytesEndianned;
 
-use std::fmt::{Binary, Debug, Formatter, LowerHex, UpperHex};
+use std::{
+    ffi::{FromVecWithNulError, IntoStringError},
+    fmt::{Binary, Debug, Formatter, LowerHex, UpperHex},
+};
 
 #[derive(Debug, Eq, PartialEq, Copy, Clone)]
 pub enum FileType {
@@ -83,18 +86,23 @@ pub enum Word {
     Word64(u64),
 }
 
-#[derive(Debug, Eq, PartialEq, Copy, Clone)]
+#[derive(Debug, Eq, PartialEq, Clone)]
 pub enum ParseError {
-    InvalidHeaderLength(usize),
+    InsuffcientHeaderLength(usize),
     NoELF(u32),
     InvalidWordWidth(u8),
     InvalidEndianness(u8),
     InvalidFileType(u16),
-    InvalidProgHeaderLength(usize),
-    InvalidProgHeaderType(u32),
+    InsufficientProgramHeaderLength(usize),
+    InvalidProgramHeaderType(u32),
     InvalidAlignment(u64),
     InvalidVirtualAddress(Word),
     InsufficientPartLength(usize),
+    InsufficientSectionHeaderLength(usize),
+    InvalidSectionHeaderType(u32),
+    InvalidSectionHeaderFlags(u64),
+    UnterminatedString,
+    InvalidSectionName(IntoStringError),
 }
 
 pub type Result<T> = std::result::Result<T, ParseError>;
@@ -129,6 +137,13 @@ impl WordWidth {
             0x01 => Ok(Width32),
             0x02 => Ok(Width64),
             _ => Err(ParseError::InvalidWordWidth(b)),
+        }
+    }
+
+    pub fn size(&self) -> usize {
+        match *self {
+            WordWidth::Width32 => 4,
+            WordWidth::Width64 => 8,
         }
     }
 }
@@ -237,6 +252,20 @@ impl Word {
             }
         }
     }
+
+    pub fn size(&self) -> usize {
+        match *self {
+            Word::Word32(_) => 4,
+            Word::Word64(_) => 8,
+        }
+    }
+
+    pub fn zero(word_width: WordWidth) -> Self {
+        match word_width {
+            WordWidth::Width32 => Word::Word32(0),
+            WordWidth::Width64 => Word::Word64(0),
+        }
+    }
 }
 
 impl From<Word> for u64 {
@@ -251,8 +280,8 @@ impl From<Word> for u64 {
 impl Debug for Word {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         match *self {
-            Word::Word32(u) => write!(f, "Word32({:#x})", u),
-            Word::Word64(u) => write!(f, "Word64({:#x})", u),
+            Word::Word32(u) => write!(f, "Word32({:#010x})", u),
+            Word::Word64(u) => write!(f, "Word64({:#018x})", u),
         }
     }
 }
@@ -329,7 +358,10 @@ mod test {
             ),
         ];
         for (data, endianness, expected) in test_data.iter() {
-            assert_eq!(FileType::parse_bytes(data, *endianness), Err(*expected));
+            assert_eq!(
+                FileType::parse_bytes(data, *endianness),
+                Err(expected.clone())
+            );
         }
     }
 

@@ -165,7 +165,7 @@ impl Header {
         let header_size = u16::from_bytes(&bytes[offsets[4]..], endianness);
 
         if required_bytes != header_size as usize {
-            return Err(ParseError::InvalidHeaderLength(header_size as usize));
+            return Err(ParseError::InsuffcientHeaderLength(header_size as usize));
         }
 
         let pheader_entry_size = u16::from_bytes(&bytes[offsets[5]..], endianness);
@@ -197,7 +197,7 @@ impl Header {
 
     fn check_length(minimum: usize, actual: usize) -> Result<()> {
         if actual < minimum {
-            Err(ParseError::InvalidHeaderLength(actual))
+            Err(ParseError::InsuffcientHeaderLength(actual))
         } else {
             Ok(())
         }
@@ -414,21 +414,21 @@ mod test {
     fn test_header_err_slice_len() {
         let test_data = [];
         let result = Header::parse_bytes(&test_data);
-        assert_eq!(result, Err(ParseError::InvalidHeaderLength(0)));
+        assert_eq!(result, Err(ParseError::InsuffcientHeaderLength(0)));
     }
 
     #[test]
     fn test_header_err_word32_len() {
         let test_data = &VALID_HEADER_DATA_32[..50];
         let result = Header::parse_bytes(test_data);
-        assert_eq!(result, Err(ParseError::InvalidHeaderLength(50)));
+        assert_eq!(result, Err(ParseError::InsuffcientHeaderLength(50)));
     }
 
     #[test]
     fn test_header_err_word64_len() {
         let test_data = &VALID_HEADER_DATA_64[..55];
         let result = Header::parse_bytes(test_data);
-        assert_eq!(result, Err(ParseError::InvalidHeaderLength(55)));
+        assert_eq!(result, Err(ParseError::InsuffcientHeaderLength(55)));
     }
 
     #[test]
