@@ -221,44 +221,12 @@ impl Header {
         self.endianness
     }
 
-    pub const fn header_version(&self) -> u8 {
-        self.header_version
-    }
-
-    pub const fn os_abi(&self) -> Abi {
-        self.os_abi
-    }
-
-    pub const fn abi_version(&self) -> u8 {
-        self.abi_version
-    }
-
-    pub const fn file_type(&self) -> FileType {
-        self.file_type
-    }
-
-    pub const fn arch(&self) -> Arch {
-        self.arch
-    }
-
-    pub const fn version(&self) -> u32 {
-        self.version
-    }
-
-    pub const fn entry_point(&self) -> Word {
-        self.entry_point
-    }
-
     pub const fn program_header_start(&self) -> Word {
         self.program_header_start
     }
 
     pub const fn section_header_start(&self) -> Word {
         self.section_header_start
-    }
-
-    pub const fn flags(&self) -> u32 {
-        self.flags
     }
 
     pub const fn program_header_entry_size(&self) -> u16 {
@@ -279,13 +247,6 @@ impl Header {
 
     pub const fn section_names_index(&self) -> u16 {
         self.section_names_index
-    }
-
-    pub const fn size(&self) -> u64 {
-        match self.word_width {
-            WordWidth::Width32 => 52,
-            WordWidth::Width64 => 64,
-        }
     }
 }
 

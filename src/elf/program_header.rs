@@ -38,8 +38,8 @@ impl ProgramHeaderSegmentType {
             0x00000005 => Ok(SharedLib),
             0x00000006 => Ok(HeaderSegment),
             0x00000007 => Ok(ThreadLocalStorage),
-            i if 0x60000000 <= i && i <= 0x6FFFFFFF => Ok(OSSpecific(i)),
-            i if 0x70000000 <= i && i <= 0x7FFFFFFF => Ok(ProcessorSpecific(i)),
+            i if (0x60000000..=0x6FFFFFFF).contains(&i) => Ok(OSSpecific(i)),
+            i if (0x70000000..=0x7FFFFFFF).contains(&i) => Ok(ProcessorSpecific(i)),
             _ => Err(ParseError::InvalidProgramHeaderType(u)),
         }
     }

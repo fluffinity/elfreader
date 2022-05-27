@@ -1,4 +1,4 @@
-use std::ffi::{CString, OsString};
+use std::ffi::CString;
 
 use super::{Endianness, FromBytesEndianned, ParseError, Result, Word, WordWidth};
 
@@ -215,7 +215,7 @@ impl UnnamedSectionHeader {
         let name = CString::new(name_bytes[..null_index].to_vec())
             .expect("checked for null byte")
             .into_string()
-            .map_err(|err| ParseError::InvalidSectionName(err))?;
+            .map_err(ParseError::InvalidSectionName)?;
         Ok(SectionHeader {
             name,
             typ: self.typ,
@@ -230,3 +230,4 @@ impl UnnamedSectionHeader {
         })
     }
 }
+//TODO: add tests

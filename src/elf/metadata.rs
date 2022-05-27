@@ -77,7 +77,7 @@ impl Metadata {
         if let Err(err) = file.read_exact(buf.as_mut_slice()) {
             return Err(IOError(err));
         }
-        Metadata::parse_program_headers(&header, buf.as_slice())
+        Metadata::parse_program_headers(header, buf.as_slice())
     }
 
     fn parse_program_headers(
@@ -116,7 +116,7 @@ impl Metadata {
         if let Err(err) = file.read_exact(buf.as_mut_slice()) {
             return Err(IOError(err));
         }
-        let unnamed_section_headers = Metadata::parse_section_headers(&header, buf.as_slice())?;
+        let unnamed_section_headers = Metadata::parse_section_headers(header, buf.as_slice())?;
         Metadata::parse_named_section_headers_from_file(header, unnamed_section_headers, file)
     }
 
@@ -153,7 +153,7 @@ impl Metadata {
             .into_iter()
             .map(|header| header.to_named(buf.as_slice()))
             .collect();
-        section_headers.map_err(|err| MetadataParseError::InvalidELF(err))
+        section_headers.map_err(MetadataParseError::InvalidELF)
     }
 
     fn parse_section_headers(
@@ -180,3 +180,5 @@ impl Metadata {
             .collect()
     }
 }
+
+//TODO: add tests
