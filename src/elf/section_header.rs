@@ -50,8 +50,8 @@ pub struct UnnamedSectionHeader {
     typ: SectionHeaderType,
     flags: SectionHeaderFlags,
     address: Word,
-    pub(super) offset: Word,
-    pub(super) size: Word,
+    offset: Word,
+    size: Word,
     link: u32,
     info: u32,
     align: Word,
@@ -140,6 +140,18 @@ impl SectionHeaderFlags {
 }
 
 impl UnnamedSectionHeader {
+    pub fn offset(&self) -> Word {
+        self.offset
+    }
+
+    pub fn size(&self) -> Word {
+        self.size
+    }
+
+    pub fn typ(&self) -> SectionHeaderType {
+        self.typ
+    }
+
     pub fn parse_bytes(
         bytes: &[u8],
         word_width: WordWidth,
@@ -200,9 +212,8 @@ impl UnnamedSectionHeader {
             .iter()
             .position(|byte| *byte == 0)
             .ok_or(ParseError::UnterminatedString)?;
-        let name = CString::from_vec_with_nul(name_bytes[..=null_index].to_vec())
-            .expect("checked for null byte");
-        let name = name
+        let name = CString::new(name_bytes[..null_index].to_vec())
+            .expect("checked for null byte")
             .into_string()
             .map_err(|err| ParseError::InvalidSectionName(err))?;
         Ok(SectionHeader {

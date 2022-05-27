@@ -1,6 +1,8 @@
 use std::fs::File;
 use std::io::{Read, Seek, SeekFrom};
 
+use crate::elf::SectionHeaderType;
+
 use super::{Header, ParseError, ProgramHeader, SectionHeader, UnnamedSectionHeader};
 
 pub struct Metadata {
@@ -44,13 +46,26 @@ impl Metadata {
         use MetadataParseError::*;
 
         let mut buf = [0; 64];
-        if let Err(err) = file.read(&mut buf) {
-            return Err(IOError(err));
-        }
-        let header = match Header::parse_bytes(&buf) {
+        let status = file.read(&mut buf);
+        let header_buf = match status {
+            Err(err) => return Err(IOError(err)),
+            Ok(n) => &buf[..n],
+        };
+        let header = match Header::parse_bytes(header_buf) {
             Err(err) => return Err(InvalidELF(err)),
             Ok(header) => header,
         };
+        let program_headers = Metadata::parse_program_headers_from_file(&header, file)?;
+        let section_headers = Metadata::parse_section_headers_from_file(&header, file)?;
+
+        Ok(Metadata::new(header, program_headers, section_headers))
+    }
+
+    fn parse_program_headers_from_file(
+        header: &Header,
+        file: &mut File,
+    ) -> Result<Vec<ProgramHeader>, MetadataParseError> {
+        use MetadataParseError::*;
 
         let pheader_offset = u64::from(header.program_header_start());
         let pheader_total_size =
@@ -62,36 +77,7 @@ impl Metadata {
         if let Err(err) = file.read_exact(buf.as_mut_slice()) {
             return Err(IOError(err));
         }
-        let program_headers = Metadata::parse_program_headers(&header, buf.as_slice())?;
-
-        let sheader_offset = u64::from(header.section_header_start());
-        let sheader_total_size =
-            (header.section_header_entry_count() * header.section_header_entry_size()) as usize;
-        let mut buf: Vec<_> = std::iter::repeat(0).take(sheader_total_size).collect();
-        if let Err(err) = file.seek(SeekFrom::Start(sheader_offset)) {
-            return Err(IOError(err));
-        }
-        if let Err(err) = file.read_exact(buf.as_mut_slice()) {
-            return Err(IOError(err));
-        }
-        let section_headers = Metadata::parse_section_headers(&header, buf.as_slice())?;
-        let (name_table_offset, name_table_length) = match section_headers.last() {
-            None => return Ok(Metadata::new(header, program_headers, Vec::new())),
-            Some(sheader) => (u64::from(sheader.offset), u64::from(sheader.size) as usize),
-        };
-        if let Err(err) = file.seek(SeekFrom::Start(name_table_offset)) {
-            return Err(IOError(err));
-        }
-        let mut buf: Vec<_> = std::iter::repeat(0).take(name_table_length).collect();
-        if let Err(err) = file.read_exact(buf.as_mut_slice()) {
-            return Err(IOError(err));
-        }
-        let section_headers: Result<Vec<_>, ParseError> = section_headers
-            .into_iter()
-            .map(|header| header.to_named(buf.as_slice()))
-            .collect();
-        let section_headers = section_headers.map_err(|err| MetadataParseError::InvalidELF(err))?;
-        Ok(Metadata::new(header, program_headers, section_headers))
+        Metadata::parse_program_headers(&header, buf.as_slice())
     }
 
     fn parse_program_headers(
@@ -112,6 +98,62 @@ impl Metadata {
                 }
             })
             .collect()
+    }
+
+    fn parse_section_headers_from_file(
+        header: &Header,
+        file: &mut File,
+    ) -> Result<Vec<SectionHeader>, MetadataParseError> {
+        use MetadataParseError::*;
+
+        let sheader_offset = u64::from(header.section_header_start());
+        let sheader_total_size =
+            (header.section_header_entry_count() * header.section_header_entry_size()) as usize;
+        let mut buf: Vec<_> = std::iter::repeat(0).take(sheader_total_size).collect();
+        if let Err(err) = file.seek(SeekFrom::Start(sheader_offset)) {
+            return Err(IOError(err));
+        }
+        if let Err(err) = file.read_exact(buf.as_mut_slice()) {
+            return Err(IOError(err));
+        }
+        let unnamed_section_headers = Metadata::parse_section_headers(&header, buf.as_slice())?;
+        Metadata::parse_named_section_headers_from_file(header, unnamed_section_headers, file)
+    }
+
+    fn parse_named_section_headers_from_file(
+        header: &Header,
+        unnamed_section_headers: Vec<UnnamedSectionHeader>,
+        file: &mut File,
+    ) -> Result<Vec<SectionHeader>, MetadataParseError> {
+        use MetadataParseError::*;
+
+        let (name_table_offset, name_table_length) =
+            match unnamed_section_headers.get(header.section_names_index() as usize) {
+                None => return Ok(Vec::new()),
+                Some(sheader) => {
+                    if sheader.typ() != SectionHeaderType::StringTable {
+                        return Err(InvalidELF(ParseError::InvalidSectionNameTableType(
+                            sheader.typ(),
+                        )));
+                    }
+                    (
+                        u64::from(sheader.offset()),
+                        u64::from(sheader.size()) as usize,
+                    )
+                }
+            };
+        if let Err(err) = file.seek(SeekFrom::Start(name_table_offset)) {
+            return Err(IOError(err));
+        }
+        let mut buf: Vec<_> = std::iter::repeat(0).take(name_table_length).collect();
+        if let Err(err) = file.read_exact(buf.as_mut_slice()) {
+            return Err(IOError(err));
+        }
+        let section_headers: Result<Vec<_>, ParseError> = unnamed_section_headers
+            .into_iter()
+            .map(|header| header.to_named(buf.as_slice()))
+            .collect();
+        section_headers.map_err(|err| MetadataParseError::InvalidELF(err))
     }
 
     fn parse_section_headers(

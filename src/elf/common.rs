@@ -1,4 +1,4 @@
-use super::FromBytesEndianned;
+use super::{FromBytesEndianned, SectionHeaderType};
 
 use std::{
     ffi::{FromVecWithNulError, IntoStringError},
@@ -103,6 +103,7 @@ pub enum ParseError {
     InvalidSectionHeaderFlags(u64),
     UnterminatedString,
     InvalidSectionName(IntoStringError),
+    InvalidSectionNameTableType(SectionHeaderType),
 }
 
 pub type Result<T> = std::result::Result<T, ParseError>;
