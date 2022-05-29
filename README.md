@@ -12,8 +12,9 @@ These information include the identification information and the section headers
 - [x] ELF header detection
 - [x] Generic program header detection
 - Detection of OS specific program header data
-- Generic section header detection
+- [x] Generic section header detection
 - Detection of OS specific section header data
+- [x] Proper basic CLI interface
 - Other features I have not thought of so far
 
 ## Build
@@ -38,5 +39,9 @@ You can also first build the elfreader with
 and then move the built executable into your path. Then you can simply use it via
 
 ```elfreader <name-of-the-elf-file>```
+
+For more information about this tool use
+
+```elfreader --help```
 
 The hex values of architectures, word size etc are looked up at [Wikipedia](https://en.wikipedia.org/wiki/Executable_and_Linkable_Format)
