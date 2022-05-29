@@ -10,10 +10,6 @@ use std::fs::File;
 
 fn main() -> Result<(), i32> {
     let arguments = cli::Arguments::parse();
-    if arguments.version {
-        println!("{}", cli::VERSION);
-        return Ok(());
-    }
     let filename = arguments.path;
     println!("Parsing ELF header of file {:?}", filename);
     let mut file = match File::open(filename.as_path()) {
