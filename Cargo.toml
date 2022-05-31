@@ -1,8 +1,11 @@
 [package]
 name = "elfreader"
 version = "0.1.0"
-authors = ["fluffyChaos <maskedFluffyPanda@protonmail.com>"]
+authors = ["fluffyChaos <23279594+fluffychaos@users.noreply.github.com>"]
 edition = "2018"
+repository = "https://github.com/fluffychaos/elfreader"
+homepage = "https://github.com/fluffychaos/elfreader"
+licence = "MIT"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
