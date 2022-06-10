@@ -205,14 +205,14 @@ impl UnnamedSectionHeader {
         }
     }
 
-    pub fn to_named(self, names_table: &[u8]) -> Result<SectionHeader> {
+    pub fn to_named(self, name_table: &[u8]) -> Result<SectionHeader> {
         let index = self.name_index as usize;
-        let name_bytes = &names_table[index..];
+        let name_bytes = &name_table[index..];
         let null_index = name_bytes
             .iter()
             .position(|byte| *byte == 0)
             .ok_or(ParseError::UnterminatedString)?;
-        let name = CString::new(name_bytes[..null_index].to_vec())
+        let name = CString::from_vec_with_nul(name_bytes[..=null_index].to_vec())
             .expect("checked for null byte")
             .into_string()
             .map_err(ParseError::InvalidSectionName)?;
